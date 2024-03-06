@@ -1,34 +1,33 @@
 ﻿#pragma once
 #include "Ember.h"
 #include <SDL/SDL_render.h>
-
-struct WindowSettings
-{
-    const char* Title;
-    int PosX;
-    int PosY;
-    int Width;
-    int Height;
-    u32 Flags;
-
-    static WindowSettings GetDefault()
-    {
-        static WindowSettings Result =
-        {
-            .Title = "New Window",
-            .PosX = SDL_WINDOWPOS_CENTERED,
-            .PosY = SDL_WINDOWPOS_CENTERED,
-            .Width = 800,
-            .Height = 600,
-            .Flags = SDL_WINDOW_SHOWN
-        };
-
-        return Result;
-    }
-};
-
 namespace Ember
 {
+    struct WindowSettings
+    {
+        const char* Title;
+        int PosX;
+        int PosY;
+        int Width;
+        int Height;
+        u32 Flags;
+
+        static WindowSettings GetDefault()
+        {
+            static WindowSettings Result =
+            {
+                .Title = "New Window",
+                .PosX = SDL_WINDOWPOS_CENTERED,
+                .PosY = SDL_WINDOWPOS_CENTERED,
+                .Width = 800,
+                .Height = 600,
+                .Flags = SDL_WINDOW_SHOWN
+            };
+
+            return Result;
+        }
+    };
+    
     class Window
     {
     public:

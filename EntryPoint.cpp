@@ -1,11 +1,12 @@
-#include "Ember.h"
 #include "Core/Application.h"
 
-int main(int argc, char** argv)
+int main(int ArgC, char** ArgV)
 {
-	Application App;
+	UNUSED_ARG(ArgC);
+	UNUSED_ARG(ArgV);
 	
-	AppConfig Config = AppConfig::GetDefault();
+	Ember::Application App;
+	Ember::AppConfig Config = Ember::AppConfig::GetDefault();
 	Config.WindowSettings.Title = "Ember";
 	if (App.Init(Config))
 	{

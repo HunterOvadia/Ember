@@ -2,6 +2,8 @@
 #include "Core/Application.h"
 #include "Core/Logging.h"
 
+using namespace Ember;
+
 Application::Application()
 	: bIsRunning(false)
 	, Window(nullptr)
@@ -16,8 +18,7 @@ bool Application::Init(const AppConfig& Config)
 		return false;
 	}
 
-	// TODO(HO): Custom UniquePtr because STD ew
-	Window = std::make_unique<Ember::Window>(Config.WindowSettings);
+	Window = Ember::MakeUnique<Ember::Window>(Config.WindowSettings);
 	if (!Window)
 	{
 		EMBER_LOG(Critical, "Window Init Failure: %s", SDL_GetError());

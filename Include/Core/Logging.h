@@ -1,6 +1,6 @@
 #pragma once
+#include "Ember.h"
 #include <map>
-#include "SDL/SDL_log.h"
 
 enum ELogCategory
 {
@@ -12,7 +12,6 @@ enum ELogCategory
 	Critical
 };
 
-// TODO(HO): No std!
 static const std::map<ELogCategory, SDL_LogPriority> LogCategoryMap =
 {
 	{ Verbose,	SDL_LOG_PRIORITY_VERBOSE },
