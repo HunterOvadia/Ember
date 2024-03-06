@@ -1,4 +1,3 @@
-#include <SDL/SDL.h>
 #include "Core/Application.h"
 #include "Core/Logging.h"
 

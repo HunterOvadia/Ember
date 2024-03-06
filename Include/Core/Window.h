@@ -1,6 +1,6 @@
 ﻿#pragma once
 #include "Ember.h"
-#include <SDL/SDL_render.h>
+
 namespace Ember
 {
     struct WindowSettings
