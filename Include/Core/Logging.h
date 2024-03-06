@@ -12,6 +12,7 @@ enum ELogCategory
 	Critical
 };
 
+// TODO(HO): No std!
 static const std::map<ELogCategory, SDL_LogPriority> LogCategoryMap =
 {
 	{ Verbose,	SDL_LOG_PRIORITY_VERBOSE },

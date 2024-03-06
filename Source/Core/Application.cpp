@@ -1,4 +1,4 @@
-#include "Application.h"
+#include "Core/Application.h"
 
 Application::Application()
 	: bIsRunning(false)
@@ -7,7 +7,7 @@ Application::Application()
 {
 }
 
-bool Application::Init(const ApplicationConfiguration& Configuration)
+bool Application::Init(const AppConfig& Config)
 {
 	if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
 	{
@@ -15,7 +15,7 @@ bool Application::Init(const ApplicationConfiguration& Configuration)
 		return false;
 	}
 
-	Window = SDL_CreateWindow(Configuration.Title, Configuration.X, Configuration.Y, Configuration.Width, Configuration.Height, Configuration.Flags);
+	Window = SDL_CreateWindow(Config.WindowTitle, Config.WindowInitPosX, Config.WindowInitPosY, Config.WindowInitWidth, Config.WindowInitHeight, Config.WindowFlags);
 	if (!Window)
 	{
 		EMBER_LOG(Critical, "SDL_CreateWindow Failure: %s", SDL_GetError());

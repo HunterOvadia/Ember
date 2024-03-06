@@ -1,13 +1,12 @@
 #include "Ember.h"
-#include "Application.h"
+#include "Core/Application.h"
 
 int main(int argc, char** argv)
 {
 	Application App;
-	
-	ApplicationConfiguration Configuration = ApplicationConfiguration::GetDefault();
-	Configuration.Title = "Ember";
-	if (App.Init(Configuration))
+	AppConfig Config = AppConfig::GetDefault();
+	Config.WindowTitle = "Ember";
+	if (App.Init(Config))
 	{
 		App.Run();
 	}
