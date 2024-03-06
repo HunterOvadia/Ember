@@ -4,7 +4,10 @@
 int main(int argc, char** argv)
 {
 	Application App;
-	if (App.Init())
+	
+	ApplicationConfiguration Configuration = ApplicationConfiguration::GetDefault();
+	Configuration.Title = "Ember";
+	if (App.Init(Configuration))
 	{
 		App.Run();
 	}

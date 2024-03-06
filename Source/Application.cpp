@@ -7,7 +7,7 @@ Application::Application()
 {
 }
 
-bool Application::Init()
+bool Application::Init(const ApplicationConfiguration& Configuration)
 {
 	if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
 	{
@@ -15,16 +15,14 @@ bool Application::Init()
 		return false;
 	}
 
-	// TODO(HO): Variables
-	Uint32 WindowFlags = SDL_WINDOW_SHOWN;
-	Window = SDL_CreateWindow("Ember", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 800, 600, WindowFlags);
+	Window = SDL_CreateWindow(Configuration.Title, Configuration.X, Configuration.Y, Configuration.Width, Configuration.Height, Configuration.Flags);
 	if (!Window)
 	{
 		EMBER_LOG(Critical, "SDL_CreateWindow Failure: %s", SDL_GetError());
 		return false;
 	}
 
-	Uint32 RendererFlags = SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC;
+	u32 RendererFlags = SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC;
 	Renderer = SDL_CreateRenderer(Window, -1, RendererFlags);
 	if (!Renderer)
 	{
