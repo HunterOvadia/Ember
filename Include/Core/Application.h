@@ -6,13 +6,18 @@ namespace Ember
 	struct AppConfig
 	{
 		WindowSettings WindowSettings;
-		static AppConfig GetDefault()
+		static AppConfig GetDefault(const char* TitleOverride = nullptr)
 		{
 			static AppConfig Result =
 			{
 				.WindowSettings = WindowSettings::GetDefault()
 			};
 
+			if(TitleOverride)
+			{
+				Result.WindowSettings.Title = TitleOverride;
+			}
+			
 			return Result;
 		}
 	};

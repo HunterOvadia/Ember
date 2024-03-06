@@ -28,7 +28,9 @@ static void EmberLog(ELogCategory Category, const char* Fmt, ...)
 {
 	va_list Args;
 	va_start(Args, Fmt);
-	SDL_LogMessageV(SDL_LOG_CATEGORY_APPLICATION, LogCategoryMap.at(Category), Fmt, Args);
+	{
+		SDL_LogMessageV(SDL_LOG_CATEGORY_APPLICATION, LogCategoryMap.at(Category), Fmt, Args);
+	}
 	va_end(Args);
 }
 
