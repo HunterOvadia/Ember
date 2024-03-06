@@ -1,6 +1,5 @@
 #pragma once
-#include <SDL/SDL.h>
-#include "Core/Logging.h"
+#include <cstdint>
 
 typedef int8_t     s8;
 typedef int16_t    s16;

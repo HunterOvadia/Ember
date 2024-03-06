@@ -4,13 +4,14 @@
 int main(int argc, char** argv)
 {
 	Application App;
+	
 	AppConfig Config = AppConfig::GetDefault();
-	Config.WindowTitle = "Ember";
+	Config.WindowSettings.Title = "Ember";
 	if (App.Init(Config))
 	{
 		App.Run();
 	}
 
-	App.Shutdown();
+	App.TearDown();
 	return 0;
 }

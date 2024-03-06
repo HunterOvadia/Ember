@@ -21,6 +21,7 @@
   <ItemGroup>
     <ClInclude Include="Include\Core\Application.h" />
     <ClInclude Include="Include\Core\Logging.h" />
+    <ClInclude Include="Include\Core\Window.h" />
     <ClInclude Include="Include\Ember.h" />
   </ItemGroup>
   <ItemGroup>
@@ -100,6 +101,7 @@
       <AdditionalIncludeDirectories>D:\CodingProjects\EmberSDL\third-party\include;D:\CodingProjects\EmberSDL\Include;</AdditionalIncludeDirectories>
       <LinkCompiled>true</LinkCompiled>
     </ClCompile>
+    <ClCompile Include="Source\Core\Window.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>

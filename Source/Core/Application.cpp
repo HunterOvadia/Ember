@@ -1,9 +1,10 @@
+#include <SDL/SDL.h>
 #include "Core/Application.h"
+#include "Core/Logging.h"
 
 Application::Application()
 	: bIsRunning(false)
 	, Window(nullptr)
-	, Renderer(nullptr)
 {
 }
 
@@ -15,39 +16,20 @@ bool Application::Init(const AppConfig& Config)
 		return false;
 	}
 
-	Window = SDL_CreateWindow(Config.WindowTitle, Config.WindowInitPosX, Config.WindowInitPosY, Config.WindowInitWidth, Config.WindowInitHeight, Config.WindowFlags);
+	// TODO(HO): Custom UniquePtr because STD ew
+	Window = std::make_unique<Ember::Window>(Config.WindowSettings);
 	if (!Window)
 	{
-		EMBER_LOG(Critical, "SDL_CreateWindow Failure: %s", SDL_GetError());
+		EMBER_LOG(Critical, "Window Init Failure: %s", SDL_GetError());
 		return false;
 	}
 
-	u32 RendererFlags = SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC;
-	Renderer = SDL_CreateRenderer(Window, -1, RendererFlags);
-	if (!Renderer)
-	{
-		EMBER_LOG(Critical, "SDL_CreateRenderer Failure: %s", SDL_GetError());
-		return false;
-	}
-	
-	bIsRunning = true;
-	return true;
+	bIsRunning = Window->Init();
+	return bIsRunning;
 }
 
-void Application::Shutdown()
+void Application::TearDown()
 {
-	if (Renderer)
-	{
-		SDL_DestroyRenderer(Renderer);
-		Renderer = nullptr;
-	}
-
-	if (Window)
-	{
-		SDL_DestroyWindow(Window);
-		Window = nullptr;
-	}
-
 	SDL_Quit();
 }
 
@@ -68,7 +50,9 @@ void Application::Update()
 void Application::Render()
 {
 	RenderBegin();
-	// TODO(HO): Rendering
+	{
+		// TODO(HO): Rendering
+	}
 	RenderEnd();
 }
 
@@ -92,10 +76,16 @@ void Application::PollEvents()
 
 void Application::RenderBegin()
 {
-	SDL_RenderClear(Renderer);
+	if(Window)
+	{
+		Window->RenderBegin();
+	}
 }
 
 void Application::RenderEnd()
 {
-	SDL_RenderPresent(Renderer);
+	if(Window)
+	{
+		Window->RenderEnd();
+	}
 }

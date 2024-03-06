@@ -1,6 +1,6 @@
 #pragma once
 #include <map>
-#include <SDL/SDL_log.h>
+#include "SDL/SDL_log.h"
 
 enum ELogCategory
 {
