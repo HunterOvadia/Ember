@@ -12,7 +12,7 @@ namespace Ember
 			{
 				.WindowSettings = WindowSettings::GetDefault()
 			};
-
+			
 			if(TitleOverride)
 			{
 				Result.WindowSettings.Title = TitleOverride;
