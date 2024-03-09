@@ -7,26 +7,25 @@ namespace Ember
     class UniquePtr
     {
     public:
-        UniquePtr() : Pointer(nullptr) {}
-        explicit UniquePtr(T* Pointer) : Pointer(Pointer) {}
+        UniquePtr() noexcept : Pointer(nullptr) {}
+        explicit UniquePtr(T* Pointer) noexcept : Pointer(Pointer) {}
         ~UniquePtr()
         {
             delete Pointer;
-            Pointer = nullptr;
         }
 
-        // Copy Ctor and Assignment - Deleted to prevent copies
+        // Deleted copy constructor and copy assignment operator to enforce uniqueness
         UniquePtr(const UniquePtr&) = delete;
         UniquePtr& operator=(const UniquePtr&) = delete;
 
         // Move Constructor
-        UniquePtr(UniquePtr<T>&& Other) noexcept : UniquePtr(Other.Pointer)
+        UniquePtr(UniquePtr&& Other) noexcept : UniquePtr(Other.Pointer)
         {
             Other.Pointer = nullptr;
         }
 
         // Move Assignment
-        UniquePtr& operator=(UniquePtr<T>&& Other) noexcept
+        UniquePtr& operator=(UniquePtr&& Other) noexcept
         {
             if(this != &Other)
             {
@@ -38,30 +37,26 @@ namespace Ember
             return (*this);
         }
 
-        T* Get() const { return Pointer; }
-        void Reset(T* NewPointer = nullptr)
-        {
-            if(Pointer)
-            {
-                delete Pointer;
-            }
-
-            Pointer = NewPointer;
-        }
-
-        T* Release()
-        {
-            T* Temp = Pointer;
-            Pointer = nullptr;
-            return Temp;
-        }
-
+        T* Get() const noexcept { return Pointer; }
         T& operator*() const { return *Pointer; }
-        T* operator->() const { return Pointer; }
+        T* operator->() const noexcept { return Pointer; }
+        explicit operator bool() const noexcept { return Pointer != nullptr; }
+        bool operator!() const noexcept { return Pointer == nullptr; }
 
-        bool operator!() const { return Pointer == nullptr; }
-        explicit operator bool() const { return Pointer != nullptr; }
-        
+        void Reset(T* NewPointer = nullptr) noexcept
+        {
+            T* OldPointer = Pointer;
+            Pointer = NewPointer;
+            delete OldPointer;
+        }
+
+        T* Release() noexcept
+        {
+            T* OldPointer = Pointer;
+            Pointer = nullptr;
+            return OldPointer;
+        }
+
     private:
         T* Pointer;
     };

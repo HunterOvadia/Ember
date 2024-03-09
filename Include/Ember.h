@@ -4,14 +4,17 @@
 #include "Containers/String.h"
 #include <SDL/SDL.h>
 
+// Type definitions for signed integers
 typedef int8_t     s8;
 typedef int16_t    s16;
 typedef int32_t    s32;
 typedef int64_t    s64;
 
+// Type definitions for unsigned integers
 typedef uint8_t     u8;
 typedef uint16_t    u16;
 typedef uint32_t    u32;
 typedef uint64_t    u64;
 
-#define UNUSED_ARG(x) (void)x
+// Macro to explicitly mark an argument as unused to avoid compiler warnings
+#define UNUSED_ARG(x) (void)(x)

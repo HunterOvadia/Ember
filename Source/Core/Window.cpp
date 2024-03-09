@@ -17,6 +17,8 @@ bool Window::Init()
     if (!SDLRenderer)
     {
         EMBER_LOG(Critical, "SDL_CreateRenderer Failure: %s", SDL_GetError());
+        SDL_DestroyWindow(SDLWindow);
+        SDLWindow = nullptr;
         return false;
     }
 
@@ -41,6 +43,7 @@ void Window::TearDown()
 
 void Window::RenderBegin()
 {
+    SDL_SetRenderDrawColor(SDLRenderer, 0, 0, 0, 255);
     SDL_RenderClear(SDLRenderer);
 }
 

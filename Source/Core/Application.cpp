@@ -18,18 +18,20 @@ bool Application::Init(const AppConfig& Config)
 	}
 
 	Window = Ember::MakeUnique<Ember::Window>(Config.WindowSettings);
-	if (!Window)
+	if (!Window->Init())
 	{
 		EMBER_LOG(Critical, "Window Init Failure: %s", SDL_GetError());
 		return false;
 	}
 
-	bIsRunning = Window->Init();
+	bIsRunning = true;
 	return bIsRunning;
 }
 
 void Application::TearDown()
 {
+	Window.Reset();
+	bIsRunning = false;
 	SDL_Quit();
 }
 

@@ -6,7 +6,7 @@ namespace Ember
 	struct AppConfig
 	{
 		WindowSettings WindowSettings;
-		static AppConfig GetDefault(const String& TitleOverride)
+		static AppConfig GetDefault(const String& TitleOverride = "")
 		{
 			static AppConfig Result =
 			{
@@ -27,7 +27,7 @@ namespace Ember
 	public:
 		Application();
 		~Application() = default;
-		Application(Application& Other) = delete;
+		Application(const Application& Other) = delete;
 		Application(Application&& Other) = delete;
 	
 		bool Init(const AppConfig& Config);

@@ -34,8 +34,8 @@ namespace Ember
         explicit Window(const WindowSettings& Settings)
             : SDLWindow(nullptr)
             , SDLRenderer(nullptr)
+            , Settings(Settings)
         {
-            this->Settings = Settings;
         }
 
         ~Window()
