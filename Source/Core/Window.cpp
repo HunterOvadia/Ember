@@ -5,7 +5,7 @@ using namespace Ember;
 
 bool Window::Init()
 {
-    SDLWindow = SDL_CreateWindow(Settings.Title, Settings.PosX, Settings.PosY, Settings.Width, Settings.Height, Settings.Flags);
+    SDLWindow = SDL_CreateWindow(Settings.Title.CStr(), Settings.PosX, Settings.PosY, Settings.Width, Settings.Height, Settings.Flags);
     if(!SDLWindow)
     {
         EMBER_LOG(Critical, "SDL_CreateWindow Failure: %s", SDL_GetError());
@@ -20,6 +20,7 @@ bool Window::Init()
         return false;
     }
 
+    EMBER_LOG(Info, "Window Initialize Success.");
     return true;
 }
 

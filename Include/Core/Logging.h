@@ -24,12 +24,12 @@ static const std::map<ELogCategory, SDL_LogPriority> LogCategoryMap =
 	{ Critical, SDL_LOG_PRIORITY_CRITICAL },
 };
 
-static void EmberLog(ELogCategory Category, const char* Fmt, ...)
+static void EmberLog(ELogCategory Category, const Ember::String Fmt, ...)
 {
 	va_list Args;
 	va_start(Args, Fmt);
 	{
-		SDL_LogMessageV(SDL_LOG_CATEGORY_APPLICATION, LogCategoryMap.at(Category), Fmt, Args);
+		SDL_LogMessageV(SDL_LOG_CATEGORY_APPLICATION, LogCategoryMap.at(Category), Fmt.CStr(), Args);
 	}
 	va_end(Args);
 }

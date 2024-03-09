@@ -5,7 +5,7 @@ namespace Ember
 {
     struct WindowSettings
     {
-        const char* Title;
+        String Title;
         int PosX;
         int PosY;
         int Width;

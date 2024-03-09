@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include "Containers/Memory/UniquePtr.h"
+#include "Containers/String.h"
 #include <SDL/SDL.h>
 
 typedef int8_t     s8;
