@@ -18,3 +18,14 @@ typedef uint64_t    u64;
 
 // Macro to explicitly mark an argument as unused to avoid compiler warnings
 #define UNUSED_ARG(x) (void)(x)
+
+#define DEBUG_BREAK() __debugbreak();
+#define EMBER_ASSERT(condition) \
+    do { \
+        if(!(condition)) { \
+            EMBER_LOG(ELogCategory::Error, "Assertion Failed: (%s), Function: (%s), File (%s), Line (%i)", #condition, __FUNCTION__, __FILE__, __LINE__); \
+            DEBUG_BREAK(); \
+        } \
+    } while (false);
+
+#define ARRAY_SIZE(arr) (sizeof((arr)) / sizeof((arr)[0]))
