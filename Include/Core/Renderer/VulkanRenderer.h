@@ -37,49 +37,49 @@ namespace Ember
 
     struct VkFrame
     {
-        VkCommandPool       CommandPool;
-        VkCommandBuffer     CommandBuffer;
-        VkFence             Fence;
-        VkImage             Backbuffer;
-        VkImageView         BackbufferView;
-        VkFramebuffer       Framebuffer;
+        VkCommandPool               CommandPool;
+        VkCommandBuffer             CommandBuffer;
+        VkFence                     Fence;
+        VkImage                     Backbuffer;
+        VkImageView                 BackbufferView;
+        VkFramebuffer               Framebuffer;
     };
 
     struct VkSemaphores
     {
-        VkSemaphore         ImageAcquiredSemaphore;
-        VkSemaphore         RenderCompleteSemaphore;
+        VkSemaphore                 ImageAcquiredSemaphore;
+        VkSemaphore                 RenderCompleteSemaphore;
     };
     
     struct VulkanContext
     {
-        VkAllocationCallbacks* Allocator = nullptr;
-        VkInstance Instance = nullptr;
-        VkPhysicalDevice PhysicalDevice = nullptr;
-        VkDevice Device = nullptr;
-        u32 QueueFamily = (u32)-1;
-        VkQueue Queue = nullptr;
-        VkDebugReportCallbackEXT DebugReport = nullptr;
-        VkPipelineCache PipelineCache = nullptr;
-        VkDescriptorPool DescriptorPool = nullptr;
+        VkAllocationCallbacks*      Allocator = nullptr;
+        VkInstance                  Instance = nullptr;
+        VkPhysicalDevice            PhysicalDevice = nullptr;
+        VkDevice                    Device = nullptr;
+        u32                         QueueFamily = (u32)-1;
+        VkQueue                     Queue = nullptr;
+        VkDebugReportCallbackEXT    DebugReport = nullptr;
+        VkPipelineCache             PipelineCache = nullptr;
+        VkDescriptorPool            DescriptorPool = nullptr;
 
-        int                 Width;
-        int                 Height;
-        VkSwapchainKHR      Swapchain;
-        VkSurfaceKHR        Surface;
-        VkSurfaceFormatKHR  SurfaceFormat;
-        VkPresentModeKHR    PresentMode = (VkPresentModeKHR)~0;
-        VkRenderPass        RenderPass;
-        VkPipeline          Pipeline;
-        bool                UseDynamicRendering;
-        bool                ClearEnable = true;
-        VkClearValue        ClearValue;
-        uint32_t            FrameIndex;
-        uint32_t            ImageCount;
-        uint32_t            SemaphoreCount;
-        uint32_t            SemaphoreIndex;
-        VkFrame*            Frames;
-        VkSemaphores*       Semaphores;
+        int                         Width;
+        int                         Height;
+        VkSwapchainKHR              Swapchain;
+        VkSurfaceKHR                Surface;
+        VkSurfaceFormatKHR          SurfaceFormat;
+        VkPresentModeKHR            PresentMode = (VkPresentModeKHR)~0;
+        VkRenderPass                RenderPass;
+        VkPipeline                  Pipeline;
+        bool                        UseDynamicRendering;
+        bool                        ClearEnable = true;
+        VkClearValue                ClearValue;
+        uint32_t                    FrameIndex;
+        uint32_t                    ImageCount;
+        uint32_t                    SemaphoreCount;
+        uint32_t                    SemaphoreIndex;
+        VkFrame*                    Frames;
+        VkSemaphores*               Semaphores;
     };
     
     class VulkanRenderer
@@ -94,18 +94,20 @@ namespace Ember
         void EndFrame();
         
     private:
-        VkPhysicalDevice SetupVulkan_SelectPhysicalDevice() const;
+        VkPhysicalDevice SelectPhysicalDevice() const;
         void RecreateSwapchainIfNecessary();
         void FrameRender(ImDrawData* DrawData);
         void FramePresent();
-        void CleanupVulkanWindow();
         void SetupVulkanWindow(VkSurfaceKHR Surface, int Width, int Height);
 
         void CreateOrResizeWindow(int Width, int Height);
+        
         void CreateSwapChain(int Width, int Height);
         void CreateCommandBuffers();
+        
         void DestroyFrame(VkFrame* Frame) const;
         void DestroySemaphore(VkSemaphores* Semaphores) const;
+        
         VkSurfaceFormatKHR SelectSurfaceFormat(const VkFormat* RequestFormats, int RequestFormatsCount, VkColorSpaceKHR RequestColorSpace) const;
         VkPresentModeKHR SelectPresentMode(const VkPresentModeKHR* RequestModes, int RequestModesCount) const;
 

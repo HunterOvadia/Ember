@@ -26,7 +26,7 @@ bool VulkanRenderer::IsExtensionAvailable(const DynamicArray<VkExtensionProperti
     return false;
 }
 
-VkPhysicalDevice VulkanRenderer::SetupVulkan_SelectPhysicalDevice() const
+VkPhysicalDevice VulkanRenderer::SelectPhysicalDevice() const
 {
     u32 GPUCount;
     CheckVkResult(vkEnumeratePhysicalDevices(VkContext.Instance, &GPUCount, nullptr));
@@ -111,7 +111,7 @@ bool VulkanRenderer::Initialize()
 #endif
     }
 
-    VkContext.PhysicalDevice = SetupVulkan_SelectPhysicalDevice();
+    VkContext.PhysicalDevice = SelectPhysicalDevice();
 
     // Select Graphics Queue Family
     {
@@ -192,9 +192,32 @@ bool VulkanRenderer::Initialize()
             return false;
         }
 
-        int W, H;
-        SDL_GetWindowSize(Window->Get(), &W, &H);
-        SetupVulkanWindow(Surface, W, H);
+        int Width, Height;
+        SDL_GetWindowSize(Window->Get(), &Width, &Height);
+
+        VkContext.Surface = Surface;
+
+        VkBool32 Res;
+        vkGetPhysicalDeviceSurfaceSupportKHR(VkContext.PhysicalDevice, VkContext.QueueFamily, VkContext.Surface, &Res);
+        if(Res != VK_TRUE)
+        {
+            EMBER_LOG(Error, "[Vulkan]: No WSI Support on Physical Device 0");
+            return false;
+        }
+
+        constexpr VkFormat RequestSurfaceImageFormat[] = { VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_B8G8R8_UNORM, VK_FORMAT_R8G8B8_UNORM };
+        constexpr VkColorSpaceKHR RequestSurfaceColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+        VkContext.SurfaceFormat = SelectSurfaceFormat(RequestSurfaceImageFormat, ARRAY_SIZE(RequestSurfaceImageFormat), RequestSurfaceColorSpace);
+
+#ifdef APP_UNLIMITED_FRAME_RATE
+        VkPresentModeKHR PresentModes[] = { VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_IMMEDIATE_KHR, VK_PRESENT_MODE_FIFO_KHR };
+#else
+        VkPresentModeKHR PresentModes[] = { VK_PRESENT_MODE_FIFO_KHR };
+#endif
+        VkContext.PresentMode = SelectPresentMode(&PresentModes[0], ARRAY_SIZE(PresentModes));
+
+        EMBER_ASSERT(MinImageCount >= 2);
+        CreateOrResizeWindow(Width, Height);
 
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
@@ -229,29 +252,7 @@ bool VulkanRenderer::Initialize()
 
 void VulkanRenderer::SetupVulkanWindow(VkSurfaceKHR Surface, int Width, int Height)
 {
-    VkContext.Surface = Surface;
 
-    VkBool32 Res;
-    vkGetPhysicalDeviceSurfaceSupportKHR(VkContext.PhysicalDevice, VkContext.QueueFamily, VkContext.Surface, &Res);
-    if(Res != VK_TRUE)
-    {
-        EMBER_LOG(Error, "[Vulkan]: No WSI Support on Physical Device 0");
-        return;
-    }
-
-    constexpr VkFormat RequestSurfaceImageFormat[] = { VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_B8G8R8_UNORM, VK_FORMAT_R8G8B8_UNORM };
-    constexpr VkColorSpaceKHR RequestSurfaceColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
-    VkContext.SurfaceFormat = SelectSurfaceFormat(RequestSurfaceImageFormat, ARRAY_SIZE(RequestSurfaceImageFormat), RequestSurfaceColorSpace);
-
-#ifdef APP_UNLIMITED_FRAME_RATE
-	VkPresentModeKHR PresentModes[] = { VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_IMMEDIATE_KHR, VK_PRESENT_MODE_FIFO_KHR };
-#else
-    VkPresentModeKHR PresentModes[] = { VK_PRESENT_MODE_FIFO_KHR };
-#endif
-    VkContext.PresentMode = SelectPresentMode(&PresentModes[0], ARRAY_SIZE(PresentModes));
-
-    EMBER_ASSERT(MinImageCount >= 2);
-    CreateOrResizeWindow(Width, Height);
 }
 
 void VulkanRenderer::CreateOrResizeWindow(int Width, int Height)
@@ -630,19 +631,6 @@ void VulkanRenderer::Shutdown()
     ImGui_ImplSDL2_Shutdown();
 	ImGui::DestroyContext();
     
-    CleanupVulkanWindow();
-    
-    vkDestroyDescriptorPool(VkContext.Device, VkContext.DescriptorPool, VkContext.Allocator);
-#ifdef APP_USE_VULKAN_DEBUG_REPORT
-    auto vkDestroyDebugReportCallbackEXT = (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(VkContext.Instance, "vkDestroyDebugReportCallbackEXT");
-    vkDestroyDebugReportCallbackEXT(VkContext.Instance, VkContext.DebugReport, VkContext.Allocator);
-#endif
-    vkDestroyDevice(VkContext.Device, VkContext.Allocator);
-    vkDestroyInstance(VkContext.Instance, VkContext.Allocator);
-}
-
-void VulkanRenderer::CleanupVulkanWindow()
-{
     CheckVkResult(vkDeviceWaitIdle(VkContext.Device));
 
     for(u32 i = 0; i < VkContext.ImageCount; ++i)
@@ -665,6 +653,14 @@ void VulkanRenderer::CleanupVulkanWindow()
     vkDestroyRenderPass(VkContext.Device, VkContext.RenderPass, VkContext.Allocator);
     vkDestroySwapchainKHR(VkContext.Device, VkContext.Swapchain, VkContext.Allocator);
     vkDestroySurfaceKHR(VkContext.Instance, VkContext.Surface, VkContext.Allocator);
+    
+    vkDestroyDescriptorPool(VkContext.Device, VkContext.DescriptorPool, VkContext.Allocator);
+#ifdef APP_USE_VULKAN_DEBUG_REPORT
+    auto vkDestroyDebugReportCallbackEXT = (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(VkContext.Instance, "vkDestroyDebugReportCallbackEXT");
+    vkDestroyDebugReportCallbackEXT(VkContext.Instance, VkContext.DebugReport, VkContext.Allocator);
+#endif
+    vkDestroyDevice(VkContext.Device, VkContext.Allocator);
+    vkDestroyInstance(VkContext.Instance, VkContext.Allocator);
 }
 
 void VulkanRenderer::BeginFrame()
