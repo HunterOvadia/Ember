@@ -5,12 +5,12 @@ using namespace Ember;
 
 bool Window::Init()
 {
-    SDLWindow = SDL_CreateWindow(Settings.Title.CStr(), Settings.PosX, Settings.PosY, Settings.Width, Settings.Height, Settings.Flags);
-    if(!SDLWindow)
-    {
-        EMBER_LOG(Critical, "SDL_CreateWindow Failure: %s", SDL_GetError());
-        return false;
-    }
+	SDLWindow = SDL_CreateWindow(Settings.Title.CStr(), Settings.PosX, Settings.PosY, Settings.Width, Settings.Height, Settings.Flags);
+	if(!SDLWindow)
+	{
+	    EMBER_LOG(Critical, "SDL_CreateWindow Failure: %s", SDL_GetError());
+	    return false;
+	}
 
 	Renderer = new VulkanRenderer(this);
 	if(!Renderer || !Renderer->Initialize())
@@ -18,9 +18,9 @@ bool Window::Init()
 		EMBER_LOG(Critical, "VulkanRenderer Create Failure!");
 		return false;
 	}
-	
-    EMBER_LOG(Info, "Window Initialize Success.");
-    return true;
+
+	EMBER_LOG(Info, "Window Initialize Success.");
+	return true;
 }
 
 void Window::TearDown()
@@ -29,12 +29,12 @@ void Window::TearDown()
 	{
 		Renderer->Shutdown();
 	}
-	
-    if(SDLWindow)
-    {
-        SDL_DestroyWindow(SDLWindow);
-        SDLWindow = nullptr;
-    }
+
+	if(SDLWindow)
+	{
+	    SDL_DestroyWindow(SDLWindow);
+	    SDLWindow = nullptr;
+	}
 }
 
 void Window::RenderBegin()
