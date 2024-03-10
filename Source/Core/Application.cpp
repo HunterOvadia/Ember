@@ -1,4 +1,7 @@
 #include "Core/Application.h"
+
+#include <Imgui/imgui_impl_sdl2.h>
+
 #include "Core/Logging.h"
 
 using namespace Ember;
@@ -63,6 +66,7 @@ void Application::PollEvents()
 	SDL_Event Event;
 	while (SDL_PollEvent(&Event))
 	{
+		ImGui_ImplSDL2_ProcessEvent(&Event);
 		switch (Event.type)
 		{
 			case SDL_QUIT:

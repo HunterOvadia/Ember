@@ -19,10 +19,12 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Include\Containers\DynamicArray.h" />
     <ClInclude Include="Include\Containers\Memory\UniquePtr.h" />
     <ClInclude Include="Include\Containers\String.h" />
     <ClInclude Include="Include\Core\Application.h" />
     <ClInclude Include="Include\Core\Logging.h" />
+    <ClInclude Include="Include\Core\Renderer\VulkanRenderer.h" />
     <ClInclude Include="Include\Core\Window.h" />
     <ClInclude Include="Include\Ember.h" />
     <ClInclude Include="Include\Misc\Forward.h" />
@@ -104,6 +106,7 @@
       <AdditionalIncludeDirectories>D:\CodingProjects\EmberSDL\third-party\include;D:\CodingProjects\EmberSDL\Include;</AdditionalIncludeDirectories>
       <LinkCompiled>true</LinkCompiled>
     </ClCompile>
+    <ClCompile Include="Source\Core\Renderer\VulkanRenderer.cpp" />
     <ClCompile Include="Source\Core\Window.cpp" />
     <ClCompile Include="third-party\include\Imgui\imgui.cpp" />
     <ClCompile Include="third-party\include\Imgui\imgui_demo.cpp" />
@@ -112,9 +115,6 @@
     <ClCompile Include="third-party\include\Imgui\imgui_impl_vulkan.cpp" />
     <ClCompile Include="third-party\include\Imgui\imgui_tables.cpp" />
     <ClCompile Include="third-party\include\Imgui\imgui_widgets.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Include\Core\Renderer" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>

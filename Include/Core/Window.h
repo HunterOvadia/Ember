@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include "Ember.h"
+#include "Renderer/VulkanRenderer.h"
 
 namespace Ember
 {
@@ -19,9 +20,9 @@ namespace Ember
                 .Title = "New Window",
                 .PosX = SDL_WINDOWPOS_CENTERED,
                 .PosY = SDL_WINDOWPOS_CENTERED,
-                .Width = 800,
-                .Height = 600,
-                .Flags = SDL_WINDOW_SHOWN
+                .Width = 1280,
+                .Height = 720,
+                .Flags = SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI
             };
 
             return Result;
@@ -33,7 +34,7 @@ namespace Ember
     public:
         explicit Window(const WindowSettings& Settings)
             : SDLWindow(nullptr)
-            , SDLRenderer(nullptr)
+            , Renderer(nullptr)
             , Settings(Settings)
         {
         }
@@ -43,18 +44,16 @@ namespace Ember
            TearDown();
         }
 
-        SDL_Window* GetWindow() const { return SDLWindow; }
-        SDL_Renderer* GetRenderer() const { return SDLRenderer; }
+        SDL_Window* Get() const { return SDLWindow; }
 
         bool Init();
         void TearDown();
-        
         void RenderBegin();
         void RenderEnd();
         
     private:
         SDL_Window* SDLWindow;
-        SDL_Renderer* SDLRenderer;
+        VulkanRenderer* Renderer;
         WindowSettings Settings;
     };
 }

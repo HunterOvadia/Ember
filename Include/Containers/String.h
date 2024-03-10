@@ -25,6 +25,17 @@ namespace Ember
 
             return Destination;
         }
+
+        static size_t StringCompare(const char* String1, const char* String2)
+        {
+            while(*String1 && (*String1 == *String2))
+            {
+                ++String1;
+                ++String2;
+            }
+            
+            return(*String1 - *String2);
+        }
     }
     
     struct String

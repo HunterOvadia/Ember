@@ -1,6 +1,6 @@
 ﻿#include "Core/Window.h"
 #include "Core/Logging.h"
-
+#include "Imgui/imgui.h"
 using namespace Ember;
 
 bool Window::Init()
@@ -12,28 +12,24 @@ bool Window::Init()
         return false;
     }
 
-    u32 RendererFlags = SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC;
-    SDLRenderer = SDL_CreateRenderer(SDLWindow, -1, RendererFlags);
-    if (!SDLRenderer)
-    {
-        EMBER_LOG(Critical, "SDL_CreateRenderer Failure: %s", SDL_GetError());
-        SDL_DestroyWindow(SDLWindow);
-        SDLWindow = nullptr;
-        return false;
-    }
-
+	Renderer = new VulkanRenderer(this);
+	if(!Renderer || !Renderer->Initialize())
+	{
+		EMBER_LOG(Critical, "VulkanRenderer Create Failure!");
+		return false;
+	}
+	
     EMBER_LOG(Info, "Window Initialize Success.");
     return true;
 }
 
 void Window::TearDown()
 {
-    if(SDLRenderer)
-    {
-        SDL_DestroyRenderer(SDLRenderer);
-        SDLRenderer = nullptr;
-    }
-    
+	if(Renderer)
+	{
+		Renderer->Shutdown();
+	}
+	
     if(SDLWindow)
     {
         SDL_DestroyWindow(SDLWindow);
@@ -43,11 +39,16 @@ void Window::TearDown()
 
 void Window::RenderBegin()
 {
-    SDL_SetRenderDrawColor(SDLRenderer, 0, 0, 0, 255);
-    SDL_RenderClear(SDLRenderer);
+	if(Renderer)
+	{
+		Renderer->BeginFrame();
+	}
 }
 
 void Window::RenderEnd()
 {
-    SDL_RenderPresent(SDLRenderer);
+	if(Renderer)
+	{
+		Renderer->EndFrame();
+	}
 }
