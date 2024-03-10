@@ -62,9 +62,6 @@ namespace Ember
         T& operator[](size_t Index) { EMBER_ASSERT(Index >= 0 && Index < InternalSize); return Data[Index]; }
         const T& operator[](size_t Index) const { EMBER_ASSERT(Index >= 0 && Index < InternalSize); return Data[Index]; }
 
-       
-
-
     private:
         size_t RequestReserveCapacityFromSize(size_t RequestedSize) const
         {
