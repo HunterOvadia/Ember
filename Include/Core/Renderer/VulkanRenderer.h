@@ -10,7 +10,7 @@
 #endif
 
 #define VK_GET_INSTANCE_PROC_ADDR(name) \
-    auto name = (PFN_##name)vkGetInstanceProcAddr(VkContext.Instance, #name);
+    auto (name) = (PFN_##name)vkGetInstanceProcAddr(VkContext.Instance, #name);
 
 static void CheckVkResult(VkResult ErrorCode)
 {
@@ -121,8 +121,10 @@ namespace Ember
         void CreateSurface();
         void SetPresentMode();
         
-        void InitializeImGui();
-
+        void ImGui_Initialize();
+        void ImGui_BeginFrame();
+        void ImGui_EndFrame();
+        
     private:
         void InternalCreateSwapChain(int Width, int Height);
 

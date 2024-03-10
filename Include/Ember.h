@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include "Core/Memory/Memory.h"
 #include "Containers/Memory/UniquePtr.h"
 #include "Containers/String.h"
 #include <SDL/SDL.h>
@@ -29,6 +30,3 @@ typedef uint64_t    u64;
     } while (false);
 
 #define ARRAY_SIZE(arr) (sizeof((arr)) / sizeof((arr)[0]))
-
-#define EMBER_ALLOC(type, count) (type*)malloc(sizeof(type) * (count));
-#define EMBER_MEMZERO(dest, count) memset(dest, 0, count);

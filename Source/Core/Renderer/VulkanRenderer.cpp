@@ -2,6 +2,7 @@
 #include <Imgui/imgui_impl_sdl2.h>
 #include <SDL/SDL_vulkan.h>
 #include "Core/Window.h"
+#include "Core/Memory/Memory.h"
 
 // TODO(HO): If we ever move away from SDL, we will need to remove the SDL properties
 using namespace Ember;
@@ -26,11 +27,11 @@ bool VulkanRenderer::Initialize()
     SDL_GetWindowSize(Window->Get(), &Width, &Height);
     CreateOrResizeSwapChain(Width, Height);
     
-    InitializeImGui();
+    ImGui_Initialize();
     return true;
 }
 
-void VulkanRenderer::InitializeImGui()
+void VulkanRenderer::ImGui_Initialize()
 {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -134,7 +135,7 @@ void VulkanRenderer::SelectGraphicsQueueFamily()
 {
     u32 Count;
     vkGetPhysicalDeviceQueueFamilyProperties(VkContext.PhysicalDevice, &Count, nullptr);
-    VkQueueFamilyProperties* Queues = (VkQueueFamilyProperties*)malloc(sizeof(VkQueueFamilyProperties) * Count);
+    VkQueueFamilyProperties* Queues = (VkQueueFamilyProperties*)Memory::Allocate(sizeof(VkQueueFamilyProperties) * Count);
     vkGetPhysicalDeviceQueueFamilyProperties(VkContext.PhysicalDevice, &Count, Queues);
     for(u32 i = 0; i < Count; ++i)
     {
@@ -145,7 +146,7 @@ void VulkanRenderer::SelectGraphicsQueueFamily()
         }
     }
 
-    free(Queues);
+    Memory::Free(Queues);
     EMBER_ASSERT(VkContext.QueueFamily != (u32)-1);
 }
 
@@ -314,8 +315,8 @@ void VulkanRenderer::InternalCreateSwapChain(int Width, int Height)
             DestroySemaphore(&VkContext.Semaphores[i]);
         }
 
-        free(VkContext.Frames);
-        free(VkContext.Semaphores);
+        Memory::Free(VkContext.Frames);
+        Memory::Free(VkContext.Semaphores);
 
         VkContext.Frames = nullptr;
         VkContext.Semaphores = nullptr;
@@ -383,10 +384,10 @@ void VulkanRenderer::InternalCreateSwapChain(int Width, int Height)
 
         EMBER_ASSERT(VkContext.Frames == nullptr && VkContext.Semaphores == nullptr);
         VkContext.SemaphoreCount = (VkContext.ImageCount + 1);
-        VkContext.Frames = EMBER_ALLOC(VkFrame, VkContext.ImageCount);
-        VkContext.Semaphores = EMBER_ALLOC(VkSemaphores, VkContext.SemaphoreCount);
-        EMBER_MEMZERO(VkContext.Frames, sizeof(VkContext.Frames[0]) * VkContext.ImageCount);
-        EMBER_MEMZERO(VkContext.Semaphores, sizeof(VkContext.Semaphores[0]) * VkContext.SemaphoreCount);
+        VkContext.Frames = Memory::AllocateType<VkFrame>(VkContext.ImageCount);
+        VkContext.Semaphores = Memory::AllocateType<VkSemaphores>(VkContext.SemaphoreCount);
+        Memory::MemZero(VkContext.Frames, sizeof(VkContext.Frames[0]) * VkContext.ImageCount);
+        Memory::MemZero(VkContext.Semaphores, sizeof(VkContext.Semaphores[0]) * VkContext.SemaphoreCount);
         for(u32 i = 0; i < VkContext.ImageCount; ++i)
         {
             VkContext.Frames[i].Backbuffer = Backbuffers[i];
@@ -652,8 +653,8 @@ void VulkanRenderer::Shutdown()
         DestroySemaphore(&VkContext.Semaphores[i]);
     }
 
-    free(VkContext.Frames);
-    free(VkContext.Semaphores);
+    Memory::Free(VkContext.Frames);
+    Memory::Free(VkContext.Semaphores);
 
     VkContext.Frames = nullptr;
     VkContext.Semaphores = nullptr;
@@ -675,10 +676,7 @@ void VulkanRenderer::Shutdown()
 void VulkanRenderer::BeginFrame()
 {
     RecreateSwapchainIfNecessary();
-	
-    ImGui_ImplVulkan_NewFrame();
-    ImGui_ImplSDL2_NewFrame();
-    ImGui::NewFrame();
+    ImGui_BeginFrame();
 
     bool ShowDemoWindow = true;
     if(ShowDemoWindow)
@@ -689,7 +687,8 @@ void VulkanRenderer::BeginFrame()
 
 void VulkanRenderer::EndFrame()
 {
-    ImGui::Render();
+    ImGui_EndFrame();
+    
     ImDrawData* DrawData = ImGui::GetDrawData();
     const bool IsMinimized = (DrawData->DisplaySize.x <= 0.0f || DrawData->DisplaySize.y <= 0.0f);
     if(!IsMinimized)
@@ -698,6 +697,20 @@ void VulkanRenderer::EndFrame()
         FramePresent();
     }
 }
+
+
+void VulkanRenderer::ImGui_BeginFrame()
+{
+    ImGui_ImplVulkan_NewFrame();
+    ImGui_ImplSDL2_NewFrame();
+    ImGui::NewFrame();
+}
+
+void VulkanRenderer::ImGui_EndFrame()
+{
+    ImGui::Render();
+}
+
 
 void VulkanRenderer::FrameRender(ImDrawData* DrawData)
 {

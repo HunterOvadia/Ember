@@ -14,7 +14,7 @@ namespace Ember
         {
             if(Data)
             {
-                free(Data);
+                Memory::Free(Data);
             }
         }
 
@@ -35,11 +35,11 @@ namespace Ember
                 return;
             }
 
-            T* NewData = (T*)malloc(NewCapacity * sizeof(T));
+            T* NewData = Memory::AllocateType<T>(NewCapacity);
             if(Data)
             {
-                memcpy(NewData, Data, InternalSize * sizeof(T));
-                free(Data);
+                Memory::Copy(NewData, Data, InternalSize * sizeof(T));
+                Memory::Free(Data);
             }
 
             Data = NewData;
@@ -62,8 +62,8 @@ namespace Ember
             {
                 Reserve(RequestReserveCapacityFromSize(InternalSize + 1));
             }
-
-            memcpy(&Data[InternalSize], &Value, sizeof(Value));
+            
+            Memory::Copy(&Data[InternalSize], &Value, sizeof(Value));
             ++InternalSize;
         }
 
