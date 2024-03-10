@@ -9,14 +9,7 @@ namespace Ember
     public:
         DynamicArray() : Data(nullptr), InternalSize(0), InternalCapacity(0) {}
         explicit DynamicArray(size_t InitialSize) : DynamicArray() { Resize(InitialSize); }
-        
-        ~DynamicArray()
-        {
-            if(Data)
-            {
-                Memory::Free(Data);
-            }
-        }
+        ~DynamicArray() { Memory::Free(Data); }
 
         void Resize(size_t NewSize)
         {
@@ -46,16 +39,6 @@ namespace Ember
             InternalCapacity = NewCapacity;
         }
 
-        T* GetData() const { return Data; }
-
-        T* begin() { return Data; }
-        const T* begin() const { return Data; }
-        T* end() { return Data + InternalSize; }
-        const T* end() const { return Data + InternalSize; }
-
-        T& operator[](size_t Index) { EMBER_ASSERT(Index >= 0 && Index < InternalSize); return Data[Index]; }
-        const T& operator[](size_t Index) const { EMBER_ASSERT(Index >= 0 && Index < InternalSize); return Data[Index]; }
-
         void Add(const T& Value)
         {
             if(InternalSize == InternalCapacity)
@@ -68,6 +51,19 @@ namespace Ember
         }
 
         size_t Size() const { return InternalSize; }
+        T* GetData() const { return Data; }
+
+        T* begin() { return Data; }
+        const T* begin() const { return Data; }
+        
+        T* end() { return Data + InternalSize; }
+        const T* end() const { return Data + InternalSize; }
+
+        T& operator[](size_t Index) { EMBER_ASSERT(Index >= 0 && Index < InternalSize); return Data[Index]; }
+        const T& operator[](size_t Index) const { EMBER_ASSERT(Index >= 0 && Index < InternalSize); return Data[Index]; }
+
+       
+
 
     private:
         size_t RequestReserveCapacityFromSize(size_t RequestedSize) const

@@ -24,6 +24,7 @@
     <ClInclude Include="Include\Containers\String.h" />
     <ClInclude Include="Include\Core\Application.h" />
     <ClInclude Include="Include\Core\Logging.h" />
+    <ClInclude Include="Include\Core\Memory\Memory.h" />
     <ClInclude Include="Include\Core\Renderer\VulkanRenderer.h" />
     <ClInclude Include="Include\Core\Window.h" />
     <ClInclude Include="Include\Ember.h" />

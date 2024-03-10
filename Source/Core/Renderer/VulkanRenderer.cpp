@@ -38,7 +38,16 @@ void VulkanRenderer::ImGui_Initialize()
     ImGuiIO& Io = ImGui::GetIO(); (void)Io;
     Io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     Io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+    Io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    Io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
     ImGui::StyleColorsDark();
+
+    ImGuiStyle& Style = ImGui::GetStyle();
+    if(Io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+    {
+        Style.WindowRounding = 0.0f;
+        Style.Colors[ImGuiCol_WindowBg].w = 1.0f;
+    }
 
     EMBER_ASSERT(MinImageCount >= 2);
     ImGui_ImplSDL2_InitForVulkan(Window->Get());
@@ -73,6 +82,213 @@ bool VulkanRenderer::IsExtensionAvailable(const DynamicArray<VkExtensionProperti
     }
 
     return false;
+}
+
+void VulkanRenderer::CreateRenderPass()
+{
+    VkAttachmentDescription Attachment = {
+        .format = VkContext.SurfaceFormat.format,
+        .samples = VK_SAMPLE_COUNT_1_BIT,
+        .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+        .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+        .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+        .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+        .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+    };
+
+    VkAttachmentReference ColorAttachment = {
+        .attachment = 0,
+        .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+    };
+
+    VkSubpassDescription Subpass = {
+        .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+        .colorAttachmentCount = 1,
+        .pColorAttachments = &ColorAttachment
+    };
+
+    VkSubpassDependency Dependency = {
+        .srcSubpass = VK_SUBPASS_EXTERNAL,
+        .dstSubpass = 0,
+        .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        .srcAccessMask = 0,
+        .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+    };
+
+    VkRenderPassCreateInfo Info = {
+        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+        .attachmentCount = 1,
+        .pAttachments = &Attachment,
+        .subpassCount = 1,
+        .pSubpasses = &Subpass,
+        .dependencyCount = 1,
+        .pDependencies = &Dependency
+    };
+    
+    CheckVkResult(vkCreateRenderPass(VkContext.Device, &Info, VkContext.Allocator, &VkContext.RenderPass));
+}
+
+void VulkanRenderer::CreateImageViews()
+{
+    VkImageSubresourceRange ImageRange = {
+        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+        .baseMipLevel = 0,
+        .levelCount = 1,
+        .baseArrayLayer = 0,
+        .layerCount = 1,
+    };
+        
+    VkImageViewCreateInfo Info = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+        .viewType = VK_IMAGE_VIEW_TYPE_2D,
+        .format = VkContext.SurfaceFormat.format,
+        .components = {
+            .r = VK_COMPONENT_SWIZZLE_R,
+            .g = VK_COMPONENT_SWIZZLE_G,
+            .b = VK_COMPONENT_SWIZZLE_B,
+            .a = VK_COMPONENT_SWIZZLE_A
+        },
+        .subresourceRange = ImageRange
+    };
+
+    for(u32 i = 0; i < VkContext.ImageCount; ++i)
+    {
+        VkFrame* Frame = &VkContext.Frames[i];
+        Info.image = Frame->Backbuffer;
+        CheckVkResult(vkCreateImageView(VkContext.Device, &Info, VkContext.Allocator, &Frame->BackbufferView));
+    }
+}
+
+void VulkanRenderer::CreateFrameBuffers()
+{
+    VkImageView Attachment[1];
+    VkFramebufferCreateInfo Info = {
+        .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+        .renderPass = VkContext.RenderPass,
+        .attachmentCount = 1,
+        .pAttachments = Attachment,
+        .width = (u32)VkContext.Width,
+        .height = (u32)VkContext.Height,
+        .layers = 1
+    };
+
+    for(u32 i = 0; i < VkContext.ImageCount; ++i)
+    {
+        VkFrame* Frame = &VkContext.Frames[i];
+        Attachment[0] = Frame->BackbufferView;
+        CheckVkResult(vkCreateFramebuffer(VkContext.Device, &Info, VkContext.Allocator, &Frame->Framebuffer));
+    }
+}
+
+void VulkanRenderer::ResetFences(VkFrame* Frame) const
+{
+    EMBER_ASSERT(Frame != nullptr);
+    CheckVkResult(vkWaitForFences(VkContext.Device, 1, &Frame->Fence, VK_TRUE, UINT64_MAX));
+    CheckVkResult(vkResetFences(VkContext.Device, 1, &Frame->Fence));
+}
+
+void VulkanRenderer::BeginCommandBuffer(VkFrame* Frame) const
+{
+    EMBER_ASSERT(Frame != nullptr);
+
+    CheckVkResult(vkResetCommandPool(VkContext.Device, Frame->CommandPool, 0));
+
+    VkCommandBufferBeginInfo Info = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+        .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
+    };
+        
+    CheckVkResult(vkBeginCommandBuffer(Frame->CommandBuffer, &Info));
+}
+
+void VulkanRenderer::BeginRenderPass(VkFrame* Frame)
+{
+    EMBER_ASSERT(Frame != nullptr);
+
+    VkRenderPassBeginInfo Info = {
+        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+        .renderPass = VkContext.RenderPass,
+        .framebuffer = Frame->Framebuffer,
+        .renderArea = {
+            .extent = {
+                .width = (u32)VkContext.Width,
+                .height = (u32)VkContext.Height
+            }
+        },
+        .clearValueCount = 1,
+        .pClearValues = &VkContext.ClearValue
+    };
+    
+    vkCmdBeginRenderPass(Frame->CommandBuffer, &Info, VK_SUBPASS_CONTENTS_INLINE);
+}
+
+void VulkanRenderer::EndRenderPass(VkFrame* Frame)
+{
+    EMBER_ASSERT(Frame != nullptr);
+    vkCmdEndRenderPass(Frame->CommandBuffer);
+}
+
+void VulkanRenderer::EndCommandBuffer(VkFrame* Frame)
+{
+    EMBER_ASSERT(Frame != nullptr);
+    CheckVkResult(vkEndCommandBuffer(Frame->CommandBuffer));
+}
+
+void VulkanRenderer::SubmitRenderQueue(VkFrame* Frame, VkSemaphore* ImageAcquiredSemaphore, VkSemaphore* RenderCompleteSemaphore)
+{
+    EMBER_ASSERT(Frame != nullptr && ImageAcquiredSemaphore != nullptr && RenderCompleteSemaphore != nullptr);
+
+    VkPipelineStageFlags WaitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    VkSubmitInfo SubmitInfo = {
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+        .waitSemaphoreCount = 1,
+        .pWaitSemaphores = ImageAcquiredSemaphore,
+        .pWaitDstStageMask = &WaitStage,
+        .commandBufferCount = 1,
+        .pCommandBuffers = &Frame->CommandBuffer,
+        .signalSemaphoreCount = 1,
+        .pSignalSemaphores = RenderCompleteSemaphore
+    };
+    
+    CheckVkResult(vkQueueSubmit(VkContext.Queue, 1, &SubmitInfo, Frame->Fence));
+}
+
+VkFrame* VulkanRenderer::GetCurrentFrame() const
+{
+    return &VkContext.Frames[VkContext.FrameIndex];
+}
+
+VkSemaphores VulkanRenderer::GetCurrentSemaphores() const
+{
+    return VkContext.Semaphores[VkContext.SemaphoreIndex];
+}
+
+void VulkanRenderer::DestroyFrames()
+{
+    CheckVkResult(vkDeviceWaitIdle(VkContext.Device));
+
+    for(u32 i = 0; i < VkContext.ImageCount; ++i)
+    {
+        DestroyFrame(&VkContext.Frames[i]);
+    }
+
+    for(u32 i = 0; i < VkContext.SemaphoreCount; ++i)
+    {
+        DestroySemaphore(&VkContext.Semaphores[i]);
+    }
+
+    Memory::Free(VkContext.Frames);
+    Memory::Free(VkContext.Semaphores);
+
+    VkContext.Frames = nullptr;
+    VkContext.Semaphores = nullptr;
+    VkContext.ImageCount = 0;
+    if(VkContext.RenderPass)
+    {
+        vkDestroyRenderPass(VkContext.Device, VkContext.RenderPass, VkContext.Allocator);
+    }
 }
 
 void VulkanRenderer::CreateVulkanInstance()
@@ -265,12 +481,6 @@ VkPhysicalDevice VulkanRenderer::SelectPhysicalDevice() const
     return nullptr;
 }
 
-void VulkanRenderer::CreateOrResizeSwapChain(int Width, int Height)
-{
-    InternalCreateSwapChain(Width, Height);
-    CreateCommandBuffers();
-}
-
 u32 VulkanRenderer::GetMinImageCountFromPresentMode(VkPresentModeKHR PresentMode)
 {
     switch(PresentMode)
@@ -296,102 +506,80 @@ u32 VulkanRenderer::GetMinImageCountFromPresentMode(VkPresentModeKHR PresentMode
     }
 }
 
+void VulkanRenderer::CreateOrResizeSwapChain(int Width, int Height)
+{
+    InternalCreateSwapChain(Width, Height);
+    CreateCommandBuffers();
+}
+
 void VulkanRenderer::InternalCreateSwapChain(int Width, int Height)
 {
-    // Create SwapChain
     VkSwapchainKHR OldSwapchain = VkContext.Swapchain;
 
+    VkContext.Swapchain = VK_NULL_HANDLE;
+
+    DestroyFrames();
+
+    if(MinImageCount == 0)
     {
-        VkContext.Swapchain = VK_NULL_HANDLE;
-        CheckVkResult(vkDeviceWaitIdle(VkContext.Device));
+        MinImageCount = GetMinImageCountFromPresentMode(VkContext.PresentMode);
+    }
 
-        for(u32 i = 0; i < VkContext.ImageCount; ++i)
-        {
-            DestroyFrame(&VkContext.Frames[i]);
-        }
+    VkSwapchainCreateInfoKHR Info = {
+        .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+        .surface = VkContext.Surface,
+        .minImageCount = MinImageCount,
+        .imageFormat = VkContext.SurfaceFormat.format,
+        .imageColorSpace = VkContext.SurfaceFormat.colorSpace,
+        .imageArrayLayers = 1,
+        .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+        .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
+        .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+        .presentMode = VkContext.PresentMode,
+        .clipped = VK_TRUE,
+        .oldSwapchain = OldSwapchain
+    };
 
-        for(u32 i = 0; i < VkContext.SemaphoreCount; ++i)
-        {
-            DestroySemaphore(&VkContext.Semaphores[i]);
-        }
+    VkSurfaceCapabilitiesKHR Capabilities;
+    CheckVkResult(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(VkContext.PhysicalDevice, VkContext.Surface, &Capabilities));
+    if(Info.minImageCount < Capabilities.minImageCount)
+    {
+        Info.minImageCount = Capabilities.minImageCount;
+    }
+    else if(Capabilities.maxImageCount != 0 && Info.minImageCount > Capabilities.maxImageCount)
+    {
+        Info.minImageCount = Capabilities.maxImageCount;
+    }
 
-        Memory::Free(VkContext.Frames);
-        Memory::Free(VkContext.Semaphores);
+    if(Capabilities.currentExtent.width == 0xffffffff)
+    {
+        Info.imageExtent.width = VkContext.Width = Width;
+        Info.imageExtent.height = VkContext.Height = Height;
+    }
+    else
+    {
+        Info.imageExtent.width = VkContext.Width = (int)Capabilities.currentExtent.width;
+        Info.imageExtent.height = VkContext.Height = (int)Capabilities.currentExtent.height;
+    }
 
-        VkContext.Frames = nullptr;
-        VkContext.Semaphores = nullptr;
-        VkContext.ImageCount = 0;
-        if(VkContext.RenderPass)
-        {
-            vkDestroyRenderPass(VkContext.Device, VkContext.RenderPass, VkContext.Allocator);
-        }
+    CheckVkResult(vkCreateSwapchainKHR(VkContext.Device, &Info, VkContext.Allocator, &VkContext.Swapchain));
+    CheckVkResult(vkGetSwapchainImagesKHR(VkContext.Device, VkContext.Swapchain, &VkContext.ImageCount, nullptr));
 
-        if(VkContext.Pipeline)
-        {
-            vkDestroyPipeline(VkContext.Device, VkContext.Pipeline, VkContext.Allocator);
-        }
+    VkImage Backbuffers[16] = {};
+    EMBER_ASSERT(VkContext.ImageCount >= MinImageCount);
+    EMBER_ASSERT(VkContext.ImageCount < ARRAY_SIZE(Backbuffers));
+    CheckVkResult(vkGetSwapchainImagesKHR(VkContext.Device, VkContext.Swapchain, &VkContext.ImageCount, Backbuffers));
 
-        if(MinImageCount == 0)
-        {
-            MinImageCount = GetMinImageCountFromPresentMode(VkContext.PresentMode);
-        }
-    
-        VkSwapchainCreateInfoKHR Info = {
-            .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-            .surface = VkContext.Surface,
-            .minImageCount = MinImageCount,
-            .imageFormat = VkContext.SurfaceFormat.format,
-            .imageColorSpace = VkContext.SurfaceFormat.colorSpace,
-            .imageArrayLayers = 1,
-            .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-            .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
-            .preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
-            .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-            .presentMode = VkContext.PresentMode,
-            .clipped = VK_TRUE,
-            .oldSwapchain = OldSwapchain
-        };
-
-        VkSurfaceCapabilitiesKHR Capabilities;
-        CheckVkResult(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(VkContext.PhysicalDevice, VkContext.Surface, &Capabilities));
-        if(Info.minImageCount < Capabilities.minImageCount)
-        {
-            Info.minImageCount = Capabilities.minImageCount;
-        }
-        else if(Capabilities.maxImageCount != 0 && Info.minImageCount > Capabilities.maxImageCount)
-        {
-            Info.minImageCount = Capabilities.maxImageCount;
-        }
-
-        if(Capabilities.currentExtent.width == 0xffffffff)
-        {
-            Info.imageExtent.width = VkContext.Width = Width;
-            Info.imageExtent.height = VkContext.Height = Height;
-        }
-        else
-        {
-            Info.imageExtent.width = VkContext.Width = (int)Capabilities.currentExtent.width;
-            Info.imageExtent.height = VkContext.Height = (int)Capabilities.currentExtent.height;
-        }
-
-        CheckVkResult(vkCreateSwapchainKHR(VkContext.Device, &Info, VkContext.Allocator, &VkContext.Swapchain));
-        CheckVkResult(vkGetSwapchainImagesKHR(VkContext.Device, VkContext.Swapchain, &VkContext.ImageCount, nullptr));
-
-        VkImage Backbuffers[16] = {};
-        EMBER_ASSERT(VkContext.ImageCount >= MinImageCount);
-        EMBER_ASSERT(VkContext.ImageCount < ARRAY_SIZE(Backbuffers));
-        CheckVkResult(vkGetSwapchainImagesKHR(VkContext.Device, VkContext.Swapchain, &VkContext.ImageCount, Backbuffers));
-
-        EMBER_ASSERT(VkContext.Frames == nullptr && VkContext.Semaphores == nullptr);
-        VkContext.SemaphoreCount = (VkContext.ImageCount + 1);
-        VkContext.Frames = Memory::AllocateType<VkFrame>(VkContext.ImageCount);
-        VkContext.Semaphores = Memory::AllocateType<VkSemaphores>(VkContext.SemaphoreCount);
-        Memory::MemZero(VkContext.Frames, sizeof(VkContext.Frames[0]) * VkContext.ImageCount);
-        Memory::MemZero(VkContext.Semaphores, sizeof(VkContext.Semaphores[0]) * VkContext.SemaphoreCount);
-        for(u32 i = 0; i < VkContext.ImageCount; ++i)
-        {
-            VkContext.Frames[i].Backbuffer = Backbuffers[i];
-        }
+    EMBER_ASSERT(VkContext.Frames == nullptr && VkContext.Semaphores == nullptr);
+    VkContext.SemaphoreCount = (VkContext.ImageCount + 1);
+    VkContext.Frames = Memory::AllocateType<VkFrame>(VkContext.ImageCount);
+    VkContext.Semaphores = Memory::AllocateType<VkSemaphores>(VkContext.SemaphoreCount);
+    Memory::MemZero(VkContext.Frames, sizeof(VkContext.Frames[0]) * VkContext.ImageCount);
+    Memory::MemZero(VkContext.Semaphores, sizeof(VkContext.Semaphores[0]) * VkContext.SemaphoreCount);
+    for(u32 i = 0; i < VkContext.ImageCount; ++i)
+    {
+        VkContext.Frames[i].Backbuffer = Backbuffers[i];
     }
 
     if(OldSwapchain)
@@ -399,108 +587,9 @@ void VulkanRenderer::InternalCreateSwapChain(int Width, int Height)
         vkDestroySwapchainKHR(VkContext.Device, OldSwapchain, VkContext.Allocator);
     }
 
-    // Create the RenderPass
-    {
-        if(VkContext.UseDynamicRendering == false)
-        {
-            VkAttachmentDescription Attachment = {
-                .format = VkContext.SurfaceFormat.format,
-                .samples = VK_SAMPLE_COUNT_1_BIT,
-                .loadOp = VkContext.ClearEnable ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-                .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-                .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-                .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-                .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-                .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
-            };
-
-            VkAttachmentReference ColorAttachment = {
-                .attachment = 0,
-                .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
-            };
-
-            VkSubpassDescription Subpass = {
-                .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
-                .colorAttachmentCount = 1,
-                .pColorAttachments = &ColorAttachment
-            };
-
-            VkSubpassDependency Dependency = {
-                .srcSubpass = VK_SUBPASS_EXTERNAL,
-                .dstSubpass = 0,
-                .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                .srcAccessMask = 0,
-                .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
-            };
-
-            VkRenderPassCreateInfo Info = {
-                .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-                .attachmentCount = 1,
-                .pAttachments = &Attachment,
-                .subpassCount = 1,
-                .pSubpasses = &Subpass,
-                .dependencyCount = 1,
-                .pDependencies = &Dependency
-            };
-            CheckVkResult(vkCreateRenderPass(VkContext.Device, &Info, VkContext.Allocator, &VkContext.RenderPass));
-        }
-    }
-
-    // Create Image Views
-    {
-        VkImageSubresourceRange ImageRange = {
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-            .baseMipLevel = 0,
-            .levelCount = 1,
-            .baseArrayLayer = 0,
-            .layerCount = 1,
-        };
-        
-        VkImageViewCreateInfo Info = {
-            .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-            .viewType = VK_IMAGE_VIEW_TYPE_2D,
-            .format = VkContext.SurfaceFormat.format,
-            .components = {
-                .r = VK_COMPONENT_SWIZZLE_R,
-                .g = VK_COMPONENT_SWIZZLE_G,
-                .b = VK_COMPONENT_SWIZZLE_B,
-                .a = VK_COMPONENT_SWIZZLE_A
-            },
-            .subresourceRange = ImageRange
-        };
-
-        for(u32 i = 0; i < VkContext.ImageCount; ++i)
-        {
-            VkFrame* Frame = &VkContext.Frames[i];
-            Info.image = Frame->Backbuffer;
-            CheckVkResult(vkCreateImageView(VkContext.Device, &Info, VkContext.Allocator, &Frame->BackbufferView));
-        }
-    }
-
-    // Create Framebuffer
-    {
-        if(VkContext.UseDynamicRendering == false)
-        {
-            VkImageView Attachment[1];
-            VkFramebufferCreateInfo Info = {
-                .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-                .renderPass = VkContext.RenderPass,
-                .attachmentCount = 1,
-                .pAttachments = Attachment,
-                .width = (u32)VkContext.Width,
-                .height = (u32)VkContext.Height,
-                .layers = 1
-            };
-
-            for(u32 i = 0; i < VkContext.ImageCount; ++i)
-            {
-                VkFrame* Frame = &VkContext.Frames[i];
-                Attachment[0] = Frame->BackbufferView;
-                CheckVkResult(vkCreateFramebuffer(VkContext.Device, &Info, VkContext.Allocator, &Frame->Framebuffer));
-            }
-        }
-    }
+    CreateRenderPass();
+    CreateImageViews();
+    CreateFrameBuffers();
 }
 
 void VulkanRenderer::CreateCommandBuffers()
@@ -588,26 +677,22 @@ VkSurfaceFormatKHR VulkanRenderer::SelectSurfaceFormat(const VkFormat* RequestFo
             };
             return Result;
         }
-        else
-        {
-            return AvailableFormats[0];
-        }
-    }
-    else
-    {
-        for(int RequestIndex = 0; RequestIndex < RequestFormatsCount; ++RequestIndex)
-        {
-            for(int AvailableIndex = 0; AvailableIndex < (int)AvailableCount; ++AvailableIndex)
-            {
-                if(AvailableFormats[AvailableIndex].format == RequestFormats[RequestIndex] && AvailableFormats[AvailableIndex].colorSpace == RequestColorSpace)
-                {
-                    return AvailableFormats[AvailableIndex];
-                }
-            }
-        }
 
         return AvailableFormats[0];
     }
+
+    for(int RequestIndex = 0; RequestIndex < RequestFormatsCount; ++RequestIndex)
+    {
+        for(int AvailableIndex = 0; AvailableIndex < (int)AvailableCount; ++AvailableIndex)
+        {
+            if(AvailableFormats[AvailableIndex].format == RequestFormats[RequestIndex] && AvailableFormats[AvailableIndex].colorSpace == RequestColorSpace)
+            {
+                return AvailableFormats[AvailableIndex];
+            }
+        }
+    }
+
+    return AvailableFormats[0];
 }
 
 VkPresentModeKHR VulkanRenderer::SelectPresentMode(const VkPresentModeKHR* RequestModes, int RequestModesCount) const
@@ -641,26 +726,8 @@ void VulkanRenderer::Shutdown()
     ImGui_ImplSDL2_Shutdown();
 	ImGui::DestroyContext();
     
-    CheckVkResult(vkDeviceWaitIdle(VkContext.Device));
-
-    for(u32 i = 0; i < VkContext.ImageCount; ++i)
-    {
-        DestroyFrame(&VkContext.Frames[i]);
-    }
-
-    for(u32 i = 0; i < VkContext.SemaphoreCount; ++i)
-    {
-        DestroySemaphore(&VkContext.Semaphores[i]);
-    }
-
-    Memory::Free(VkContext.Frames);
-    Memory::Free(VkContext.Semaphores);
-
-    VkContext.Frames = nullptr;
-    VkContext.Semaphores = nullptr;
-
-    vkDestroyPipeline(VkContext.Device, VkContext.Pipeline, VkContext.Allocator);
-    vkDestroyRenderPass(VkContext.Device, VkContext.RenderPass, VkContext.Allocator);
+    DestroyFrames();
+    
     vkDestroySwapchainKHR(VkContext.Device, VkContext.Swapchain, VkContext.Allocator);
     vkDestroySurfaceKHR(VkContext.Instance, VkContext.Surface, VkContext.Allocator);
     
@@ -689,11 +756,18 @@ void VulkanRenderer::EndFrame()
 {
     ImGui_EndFrame();
     
-    ImDrawData* DrawData = ImGui::GetDrawData();
-    const bool IsMinimized = (DrawData->DisplaySize.x <= 0.0f || DrawData->DisplaySize.y <= 0.0f);
+    ImDrawData* MainDrawData = ImGui::GetDrawData();
+    const bool IsMinimized = (MainDrawData->DisplaySize.x <= 0.0f || MainDrawData->DisplaySize.y <= 0.0f);
     if(!IsMinimized)
     {
-        FrameRender(DrawData);
+        FrameRender(MainDrawData);
+
+        if(ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+        {
+            ImGui::UpdatePlatformWindows();
+            ImGui::RenderPlatformWindowsDefault();
+        }
+        
         FramePresent();
     }
 }
@@ -711,11 +785,10 @@ void VulkanRenderer::ImGui_EndFrame()
     ImGui::Render();
 }
 
-
 void VulkanRenderer::FrameRender(ImDrawData* DrawData)
 {
-    VkSemaphore ImageAcquiredSemaphore = VkContext.Semaphores[VkContext.SemaphoreIndex].ImageAcquiredSemaphore;
-    VkSemaphore RenderCompleteSemaphore = VkContext.Semaphores[VkContext.SemaphoreIndex].RenderCompleteSemaphore;
+    VkSemaphore ImageAcquiredSemaphore = GetCurrentSemaphores().ImageAcquiredSemaphore;
+    VkSemaphore RenderCompleteSemaphore = GetCurrentSemaphores().RenderCompleteSemaphore;
     VkResult Error = vkAcquireNextImageKHR(VkContext.Device, VkContext.Swapchain, UINT64_MAX, ImageAcquiredSemaphore, VK_NULL_HANDLE, &VkContext.FrameIndex);
     if(Error == VK_ERROR_OUT_OF_DATE_KHR || Error == VK_SUBOPTIMAL_KHR)
     {
@@ -724,57 +797,17 @@ void VulkanRenderer::FrameRender(ImDrawData* DrawData)
     }
     CheckVkResult(Error);
 
-    VkFrame* Frame = &VkContext.Frames[VkContext.FrameIndex];
+    VkFrame* Frame = GetCurrentFrame();
+    
+    ResetFences(Frame);
+    BeginCommandBuffer(Frame);
+    BeginRenderPass(Frame);
     {
-        CheckVkResult(vkWaitForFences(VkContext.Device, 1, &Frame->Fence, VK_TRUE, UINT64_MAX));
-        CheckVkResult(vkResetFences(VkContext.Device, 1, &Frame->Fence));
+        ImGui_ImplVulkan_RenderDrawData(DrawData, Frame->CommandBuffer);
     }
-    {
-        CheckVkResult(vkResetCommandPool(VkContext.Device, Frame->CommandPool, 0));
-
-        VkCommandBufferBeginInfo Info = {
-            .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-            .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
-        };
-        
-        CheckVkResult(vkBeginCommandBuffer(Frame->CommandBuffer, &Info));
-    }
-    {
-        VkRenderPassBeginInfo Info = {
-            .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-            .renderPass = VkContext.RenderPass,
-            .framebuffer = Frame->Framebuffer,
-            .renderArea = {
-                .extent = {
-                    .width = (u32)VkContext.Width,
-                    .height = (u32)VkContext.Height
-                }
-            },
-            .clearValueCount = 1,
-            .pClearValues = &VkContext.ClearValue
-        };
-        vkCmdBeginRenderPass(Frame->CommandBuffer, &Info, VK_SUBPASS_CONTENTS_INLINE);
-    }
-
-    ImGui_ImplVulkan_RenderDrawData(DrawData, Frame->CommandBuffer);
-
-    vkCmdEndRenderPass(Frame->CommandBuffer);
-    {
-        VkPipelineStageFlags WaitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        VkSubmitInfo SubmitInfo = {
-            .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-            .waitSemaphoreCount = 1,
-            .pWaitSemaphores = &ImageAcquiredSemaphore,
-            .pWaitDstStageMask = &WaitStage,
-            .commandBufferCount = 1,
-            .pCommandBuffers = &Frame->CommandBuffer,
-            .signalSemaphoreCount = 1,
-            .pSignalSemaphores = &RenderCompleteSemaphore
-        };
-
-        CheckVkResult(vkEndCommandBuffer(Frame->CommandBuffer));
-        CheckVkResult(vkQueueSubmit(VkContext.Queue, 1, &SubmitInfo, Frame->Fence));
-    }
+    EndRenderPass(Frame);
+    EndCommandBuffer(Frame);
+    SubmitRenderQueue(Frame, &ImageAcquiredSemaphore, &RenderCompleteSemaphore);
 }
 
 void VulkanRenderer::FramePresent()
@@ -784,7 +817,7 @@ void VulkanRenderer::FramePresent()
         return;
     }
 
-    VkSemaphore RenderCompleteSemaphore = VkContext.Semaphores[VkContext.SemaphoreIndex].RenderCompleteSemaphore;
+    VkSemaphore RenderCompleteSemaphore = GetCurrentSemaphores().RenderCompleteSemaphore;
 
     VkPresentInfoKHR PresentInfo = {
         .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,

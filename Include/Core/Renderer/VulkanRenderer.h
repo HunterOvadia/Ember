@@ -9,8 +9,7 @@
 #define APP_USE_VULKAN_DEBUG_REPORT
 #endif
 
-#define VK_GET_INSTANCE_PROC_ADDR(name) \
-    auto (name) = (PFN_##name)vkGetInstanceProcAddr(VkContext.Instance, #name);
+#define VK_GET_INSTANCE_PROC_ADDR(name) auto (name) = (PFN_##name)vkGetInstanceProcAddr(VkContext.Instance, #name);
 
 static void CheckVkResult(VkResult ErrorCode)
 {
@@ -72,9 +71,6 @@ namespace Ember
         VkSurfaceFormatKHR          SurfaceFormat;
         VkPresentModeKHR            PresentMode = (VkPresentModeKHR)~0;
         VkRenderPass                RenderPass;
-        VkPipeline                  Pipeline;
-        bool                        UseDynamicRendering;
-        bool                        ClearEnable = true;
         VkClearValue                ClearValue;
         uint32_t                    FrameIndex;
         uint32_t                    ImageCount;
@@ -112,7 +108,7 @@ namespace Ember
 
         static u32 GetMinImageCountFromPresentMode(VkPresentModeKHR PresentMode);
         static bool IsExtensionAvailable(const DynamicArray<VkExtensionProperties>& Properties, const char* Extension);
-
+        
         void CreateVulkanInstance();
         void SelectGraphicsQueueFamily();
         void CreatePhysicalDevice();
@@ -120,6 +116,23 @@ namespace Ember
         void CreateDescriptorPool();
         void CreateSurface();
         void SetPresentMode();
+
+        void CreateRenderPass();
+        void CreateImageViews();
+        void CreateFrameBuffers();
+
+        void ResetFences(VkFrame* Frame) const;
+        void BeginCommandBuffer(VkFrame* Frame) const;
+        void BeginRenderPass(VkFrame* Frame);
+
+        void EndRenderPass(VkFrame* Frame);
+        void EndCommandBuffer(VkFrame* Frame);
+        void SubmitRenderQueue(VkFrame* Frame, VkSemaphore* ImageAcquiredSemaphore, VkSemaphore* RenderCompleteSemaphore);
+
+        VkFrame* GetCurrentFrame() const;
+        VkSemaphores GetCurrentSemaphores() const;
+
+        void DestroyFrames();
         
         void ImGui_Initialize();
         void ImGui_BeginFrame();
