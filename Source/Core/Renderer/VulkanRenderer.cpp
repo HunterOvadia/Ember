@@ -12,6 +12,54 @@ VulkanRenderer::VulkanRenderer(Ember::Window* Window)
 {
 }
 
+bool VulkanRenderer::Initialize()
+{
+    CreateVulkanInstance();
+    CreatePhysicalDevice();
+    SelectGraphicsQueueFamily();
+    CreateLogicalDevice();
+    CreateDescriptorPool();
+    CreateSurface();
+    SetPresentMode();
+
+    int Width, Height;
+    SDL_GetWindowSize(Window->Get(), &Width, &Height);
+    CreateOrResizeSwapChain(Width, Height);
+    
+    InitializeImGui();
+    return true;
+}
+
+void VulkanRenderer::InitializeImGui()
+{
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& Io = ImGui::GetIO(); (void)Io;
+    Io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    Io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+    ImGui::StyleColorsDark();
+
+    EMBER_ASSERT(MinImageCount >= 2);
+    ImGui_ImplSDL2_InitForVulkan(Window->Get());
+    ImGui_ImplVulkan_InitInfo InitInfo = {
+        .Instance = VkContext.Instance,
+        .PhysicalDevice = VkContext.PhysicalDevice,
+        .Device = VkContext.Device,
+        .QueueFamily = VkContext.QueueFamily,
+        .Queue = VkContext.Queue,
+        .DescriptorPool = VkContext.DescriptorPool,
+        .RenderPass = VkContext.RenderPass,
+        .MinImageCount = MinImageCount,
+        .ImageCount = VkContext.ImageCount,
+        .MSAASamples = VK_SAMPLE_COUNT_1_BIT,
+        .PipelineCache = VkContext.PipelineCache,
+        .Subpass = 0,
+        .Allocator = VkContext.Allocator,
+        .CheckVkResultFn = CheckVkResult
+    };
+    
+    ImGui_ImplVulkan_Init(&InitInfo);
+}
 
 bool VulkanRenderer::IsExtensionAvailable(const DynamicArray<VkExtensionProperties>& Properties, const char* Extension)
 {
@@ -26,15 +74,178 @@ bool VulkanRenderer::IsExtensionAvailable(const DynamicArray<VkExtensionProperti
     return false;
 }
 
+void VulkanRenderer::CreateVulkanInstance()
+{
+    u32 ExtensionsCount = 0;
+    SDL_Vulkan_GetInstanceExtensions(Window->Get(), &ExtensionsCount, nullptr);
+
+    DynamicArray<const char*> Extensions(ExtensionsCount);
+    SDL_Vulkan_GetInstanceExtensions(Window->Get(), &ExtensionsCount, Extensions.GetData());
+    
+    VkInstanceCreateInfo CreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO
+    };
+
+    u32 PropertiesCount;
+    vkEnumerateInstanceExtensionProperties(nullptr, &PropertiesCount, nullptr);
+
+    DynamicArray<VkExtensionProperties> Properties(PropertiesCount);
+    CheckVkResult(vkEnumerateInstanceExtensionProperties(nullptr, &PropertiesCount, Properties.GetData()));
+
+    if(IsExtensionAvailable(Properties, VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME))
+    {
+        Extensions.Add(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+    }
+
+#ifdef VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME
+    if(IsExtensionAvailable(Properties, VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME))
+    {
+        Extensions.Add(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+        CreateInfo.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+    }
+#endif
+
+#ifdef APP_USE_VULKAN_DEBUG_REPORT
+    const char* Layers[] = { "VK_LAYER_KHRONOS_validation" };
+    CreateInfo.enabledLayerCount = 1;
+    CreateInfo.ppEnabledLayerNames = Layers;
+    Extensions.Add("VK_EXT_debug_report");
+#endif
+
+    CreateInfo.enabledExtensionCount = (u32)Extensions.Size();
+    CreateInfo.ppEnabledExtensionNames = Extensions.GetData();
+    CheckVkResult(vkCreateInstance(&CreateInfo, VkContext.Allocator, &VkContext.Instance));
+
+#ifdef APP_USE_VULKAN_DEBUG_REPORT
+    VK_GET_INSTANCE_PROC_ADDR(vkCreateDebugReportCallbackEXT);
+    EMBER_ASSERT(vkCreateDebugReportCallbackEXT != nullptr);
+    VkDebugReportCallbackCreateInfoEXT DebugReportCreateInfo =
+    {
+        .sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CREATE_INFO_EXT,
+        .flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT | VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT,
+        .pfnCallback = DebugReportFn,
+        .pUserData = nullptr
+    };
+    CheckVkResult(vkCreateDebugReportCallbackEXT(VkContext.Instance, &DebugReportCreateInfo, VkContext.Allocator, &VkContext.DebugReport));
+#endif
+}
+
+void VulkanRenderer::SelectGraphicsQueueFamily()
+{
+    u32 Count;
+    vkGetPhysicalDeviceQueueFamilyProperties(VkContext.PhysicalDevice, &Count, nullptr);
+    VkQueueFamilyProperties* Queues = (VkQueueFamilyProperties*)malloc(sizeof(VkQueueFamilyProperties) * Count);
+    vkGetPhysicalDeviceQueueFamilyProperties(VkContext.PhysicalDevice, &Count, Queues);
+    for(u32 i = 0; i < Count; ++i)
+    {
+        if(Queues[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
+        {
+            VkContext.QueueFamily = i;
+            break;
+        }
+    }
+
+    free(Queues);
+    EMBER_ASSERT(VkContext.QueueFamily != (u32)-1);
+}
+
+void VulkanRenderer::CreatePhysicalDevice()
+{
+    VkContext.PhysicalDevice = SelectPhysicalDevice();
+}
+
+void VulkanRenderer::CreateLogicalDevice()
+{
+    DynamicArray<const char*> DeviceExtensions;
+    DeviceExtensions.Add("VK_KHR_swapchain");
+
+    u32 PropertiesCount;
+    vkEnumerateDeviceExtensionProperties(VkContext.PhysicalDevice, nullptr, &PropertiesCount, nullptr);
+        
+    DynamicArray<VkExtensionProperties> Properties(PropertiesCount);
+    vkEnumerateDeviceExtensionProperties(VkContext.PhysicalDevice, nullptr, &PropertiesCount, Properties.GetData());
+#ifdef VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME
+    if(IsExtensionAvailable(Properties, VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME))
+    {
+        DeviceExtensions.push_back(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
+    }
+#endif
+
+    constexpr float QueuePriority[] = { 1.0f };
+    VkDeviceQueueCreateInfo QueueInfo[1] = {};
+    QueueInfo[0].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    QueueInfo[0].queueFamilyIndex = VkContext.QueueFamily;
+    QueueInfo[0].queueCount = 1;
+    QueueInfo[0].pQueuePriorities = QueuePriority;
+
+    VkDeviceCreateInfo CreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+        .queueCreateInfoCount = ARRAY_SIZE(QueueInfo),
+        .pQueueCreateInfos = QueueInfo,
+        .enabledExtensionCount = (u32)DeviceExtensions.Size(),
+        .ppEnabledExtensionNames = DeviceExtensions.GetData()
+    };
+    CheckVkResult(vkCreateDevice(VkContext.PhysicalDevice, &CreateInfo, VkContext.Allocator, &VkContext.Device));
+    vkGetDeviceQueue(VkContext.Device, VkContext.QueueFamily, 0, &VkContext.Queue);
+}
+
+void VulkanRenderer::CreateDescriptorPool()
+{
+    VkDescriptorPoolSize PoolSizes[] =
+    {
+        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1 },
+    };
+
+    VkDescriptorPoolCreateInfo PoolInfo = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+        .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
+        .maxSets = 1,
+        .poolSizeCount = ARRAY_SIZE(PoolSizes),
+        .pPoolSizes = PoolSizes
+    };
+    
+    CheckVkResult(vkCreateDescriptorPool(VkContext.Device, &PoolInfo, VkContext.Allocator, &VkContext.DescriptorPool));
+}
+
+void VulkanRenderer::CreateSurface()
+{
+    if(SDL_Vulkan_CreateSurface(Window->Get(), VkContext.Instance, &VkContext.Surface) == 0)
+    {
+        EMBER_LOG(ELogCategory::Error, "Failed to create Vulkan Surface!");
+        return;
+    }
+    
+    VkBool32 Res;
+    vkGetPhysicalDeviceSurfaceSupportKHR(VkContext.PhysicalDevice, VkContext.QueueFamily, VkContext.Surface, &Res);
+    if(Res != VK_TRUE)
+    {
+        EMBER_LOG(Error, "[Vulkan]: No WSI Support on Physical Device 0");
+        return;
+    }
+
+    constexpr VkFormat RequestSurfaceImageFormat[] = { VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_B8G8R8_UNORM, VK_FORMAT_R8G8B8_UNORM };
+    constexpr VkColorSpaceKHR RequestSurfaceColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+    VkContext.SurfaceFormat = SelectSurfaceFormat(RequestSurfaceImageFormat, ARRAY_SIZE(RequestSurfaceImageFormat), RequestSurfaceColorSpace);
+}
+
+void VulkanRenderer::SetPresentMode()
+{
+#ifdef APP_UNLIMITED_FRAME_RATE
+    VkPresentModeKHR PresentModes[] = { VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_IMMEDIATE_KHR, VK_PRESENT_MODE_FIFO_KHR };
+#else
+    VkPresentModeKHR PresentModes[] = { VK_PRESENT_MODE_FIFO_KHR };
+#endif
+    VkContext.PresentMode = SelectPresentMode(&PresentModes[0], ARRAY_SIZE(PresentModes));
+}
+
 VkPhysicalDevice VulkanRenderer::SelectPhysicalDevice() const
 {
-    u32 GPUCount;
+    u32 GPUCount = 0;
     CheckVkResult(vkEnumeratePhysicalDevices(VkContext.Instance, &GPUCount, nullptr));
     EMBER_ASSERT(GPUCount > 0);
 
     DynamicArray<VkPhysicalDevice> GPUs(GPUCount);
     CheckVkResult(vkEnumeratePhysicalDevices(VkContext.Instance, &GPUCount, GPUs.GetData()));
-
     for(VkPhysicalDevice& CurrentDevice : GPUs)
     {
         VkPhysicalDeviceProperties Properties;
@@ -53,211 +264,9 @@ VkPhysicalDevice VulkanRenderer::SelectPhysicalDevice() const
     return nullptr;
 }
 
-bool VulkanRenderer::Initialize()
+void VulkanRenderer::CreateOrResizeSwapChain(int Width, int Height)
 {
-    DynamicArray<const char*> Extensions;
-    u32 ExtensionsCount = 0;
-    SDL_Vulkan_GetInstanceExtensions(Window->Get(), &ExtensionsCount, nullptr);
-    Extensions.Resize(ExtensionsCount);
-    SDL_Vulkan_GetInstanceExtensions(Window->Get(), &ExtensionsCount, Extensions.GetData());
-    
-    // Create Vulkan Instance
-    {
-        VkInstanceCreateInfo CreateInfo = {
-            .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO
-        };
-
-        u32 PropertiesCount;
-        DynamicArray<VkExtensionProperties> Properties;
-        vkEnumerateInstanceExtensionProperties(nullptr, &PropertiesCount, nullptr);
-        Properties.Resize(PropertiesCount);
-        CheckVkResult(vkEnumerateInstanceExtensionProperties(nullptr, &PropertiesCount, Properties.GetData()));
-
-        if(IsExtensionAvailable(Properties, VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME))
-        {
-            Extensions.Add(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-        }
-
-#ifdef VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME
-        if(IsExtensionAvailable(Properties, VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME))
-        {
-            Extensions.Add(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
-            CreateInfo.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
-        }
-#endif
-
-#ifdef APP_USE_VULKAN_DEBUG_REPORT
-        const char* Layers[] = { "VK_LAYER_KHRONOS_validation" };
-        CreateInfo.enabledLayerCount = 1;
-        CreateInfo.ppEnabledLayerNames = Layers;
-        Extensions.Add("VK_EXT_debug_report");
-#endif
-
-        CreateInfo.enabledExtensionCount = (u32)Extensions.Size();
-        CreateInfo.ppEnabledExtensionNames = Extensions.GetData();
-        CheckVkResult(vkCreateInstance(&CreateInfo, VkContext.Allocator, &VkContext.Instance));
-
-#ifdef APP_USE_VULKAN_DEBUG_REPORT
-        auto vkCreateDebugReportCallbackEXT = (PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr(VkContext.Instance, "vkCreateDebugReportCallbackEXT");
-        EMBER_ASSERT(vkCreateDebugReportCallbackEXT != nullptr);
-        VkDebugReportCallbackCreateInfoEXT DebugReportCreateInfo =
-        {
-            .sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CREATE_INFO_EXT,
-            .flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT | VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT,
-            .pfnCallback = DebugReportFn,
-            .pUserData = nullptr
-        };
-        CheckVkResult(vkCreateDebugReportCallbackEXT(VkContext.Instance, &DebugReportCreateInfo, VkContext.Allocator, &VkContext.DebugReport));
-#endif
-    }
-
-    VkContext.PhysicalDevice = SelectPhysicalDevice();
-
-    // Select Graphics Queue Family
-    {
-        u32 Count;
-        vkGetPhysicalDeviceQueueFamilyProperties(VkContext.PhysicalDevice, &Count, nullptr);
-        VkQueueFamilyProperties* Queues = (VkQueueFamilyProperties*)malloc(sizeof(VkQueueFamilyProperties) * Count);
-        vkGetPhysicalDeviceQueueFamilyProperties(VkContext.PhysicalDevice, &Count, Queues);
-        for(u32 i = 0; i < Count; ++i)
-        {
-            if(Queues[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
-            {
-                VkContext.QueueFamily = i;
-                break;
-            }
-        }
-
-        free(Queues);
-        EMBER_ASSERT(VkContext.QueueFamily != (u32)-1);
-    }
-
-    // Create Logical Device
-    {
-        DynamicArray<const char*> DeviceExtensions;
-        DeviceExtensions.Add("VK_KHR_swapchain");
-
-        u32 PropertiesCount;
-        DynamicArray<VkExtensionProperties> Properties;
-        vkEnumerateDeviceExtensionProperties(VkContext.PhysicalDevice, nullptr, &PropertiesCount, nullptr);
-        Properties.Resize(PropertiesCount);
-        vkEnumerateDeviceExtensionProperties(VkContext.PhysicalDevice, nullptr, &PropertiesCount, Properties.GetData());
-#ifdef VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME
-			if(IsExtensionAvailable(Properties, VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME))
-			{
-				DeviceExtensions.push_back(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
-			}
-#endif
-
-        constexpr float QueuePriority[] = { 1.0f };
-        VkDeviceQueueCreateInfo QueueInfo[1] = {};
-        QueueInfo[0].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-        QueueInfo[0].queueFamilyIndex = VkContext.QueueFamily;
-        QueueInfo[0].queueCount = 1;
-        QueueInfo[0].pQueuePriorities = QueuePriority;
-
-        VkDeviceCreateInfo CreateInfo = {
-            .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-            .queueCreateInfoCount = ARRAY_SIZE(QueueInfo),
-            .pQueueCreateInfos = QueueInfo,
-            .enabledExtensionCount = (u32)DeviceExtensions.Size(),
-            .ppEnabledExtensionNames = DeviceExtensions.GetData()
-        };
-        CheckVkResult(vkCreateDevice(VkContext.PhysicalDevice, &CreateInfo, VkContext.Allocator, &VkContext.Device));
-        vkGetDeviceQueue(VkContext.Device, VkContext.QueueFamily, 0, &VkContext.Queue);
-    }
-
-    // Create Descriptor Pool
-    {
-        VkDescriptorPoolSize PoolSizes[] =
-        {
-            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1 },
-        };
-
-        VkDescriptorPoolCreateInfo PoolInfo = {
-            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-            .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
-            .maxSets = 1,
-            .poolSizeCount = ARRAY_SIZE(PoolSizes),
-            .pPoolSizes = PoolSizes
-        };
-        CheckVkResult(vkCreateDescriptorPool(VkContext.Device, &PoolInfo, VkContext.Allocator, &VkContext.DescriptorPool));
-    }
-
-    {
-        VkSurfaceKHR Surface;
-        if(SDL_Vulkan_CreateSurface(Window->Get(), VkContext.Instance, &Surface) == 0)
-        {
-            EMBER_LOG(ELogCategory::Error, "Failed to create Vulkan Surface!");
-            return false;
-        }
-
-        int Width, Height;
-        SDL_GetWindowSize(Window->Get(), &Width, &Height);
-
-        VkContext.Surface = Surface;
-
-        VkBool32 Res;
-        vkGetPhysicalDeviceSurfaceSupportKHR(VkContext.PhysicalDevice, VkContext.QueueFamily, VkContext.Surface, &Res);
-        if(Res != VK_TRUE)
-        {
-            EMBER_LOG(Error, "[Vulkan]: No WSI Support on Physical Device 0");
-            return false;
-        }
-
-        constexpr VkFormat RequestSurfaceImageFormat[] = { VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_B8G8R8_UNORM, VK_FORMAT_R8G8B8_UNORM };
-        constexpr VkColorSpaceKHR RequestSurfaceColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
-        VkContext.SurfaceFormat = SelectSurfaceFormat(RequestSurfaceImageFormat, ARRAY_SIZE(RequestSurfaceImageFormat), RequestSurfaceColorSpace);
-
-#ifdef APP_UNLIMITED_FRAME_RATE
-        VkPresentModeKHR PresentModes[] = { VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_IMMEDIATE_KHR, VK_PRESENT_MODE_FIFO_KHR };
-#else
-        VkPresentModeKHR PresentModes[] = { VK_PRESENT_MODE_FIFO_KHR };
-#endif
-        VkContext.PresentMode = SelectPresentMode(&PresentModes[0], ARRAY_SIZE(PresentModes));
-
-        EMBER_ASSERT(MinImageCount >= 2);
-        CreateOrResizeWindow(Width, Height);
-
-        IMGUI_CHECKVERSION();
-        ImGui::CreateContext();
-        ImGuiIO& Io = ImGui::GetIO(); (void)Io;
-        Io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-        Io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
-        ImGui::StyleColorsDark();
-
-        ImGui_ImplSDL2_InitForVulkan(Window->Get());
-        ImGui_ImplVulkan_InitInfo InitInfo = {
-            .Instance = VkContext.Instance,
-            .PhysicalDevice = VkContext.PhysicalDevice,
-            .Device = VkContext.Device,
-            .QueueFamily = VkContext.QueueFamily,
-            .Queue = VkContext.Queue,
-            .DescriptorPool = VkContext.DescriptorPool,
-            .RenderPass = VkContext.RenderPass,
-            .MinImageCount = MinImageCount,
-            .ImageCount = VkContext.ImageCount,
-            .MSAASamples = VK_SAMPLE_COUNT_1_BIT,
-            .PipelineCache = VkContext.PipelineCache,
-            .Subpass = 0,
-            .Allocator = VkContext.Allocator,
-            .CheckVkResultFn = CheckVkResult
-        };
-        
-        ImGui_ImplVulkan_Init(&InitInfo);
-    }
-
-    return true;
-}
-
-void VulkanRenderer::SetupVulkanWindow(VkSurfaceKHR Surface, int Width, int Height)
-{
-
-}
-
-void VulkanRenderer::CreateOrResizeWindow(int Width, int Height)
-{
-    CreateSwapChain(Width, Height);
+    InternalCreateSwapChain(Width, Height);
     CreateCommandBuffers();
 }
 
@@ -286,7 +295,7 @@ u32 VulkanRenderer::GetMinImageCountFromPresentMode(VkPresentModeKHR PresentMode
     }
 }
 
-void VulkanRenderer::CreateSwapChain(int Width, int Height)
+void VulkanRenderer::InternalCreateSwapChain(int Width, int Height)
 {
     // Create SwapChain
     VkSwapchainKHR OldSwapchain = VkContext.Swapchain;
@@ -656,7 +665,7 @@ void VulkanRenderer::Shutdown()
     
     vkDestroyDescriptorPool(VkContext.Device, VkContext.DescriptorPool, VkContext.Allocator);
 #ifdef APP_USE_VULKAN_DEBUG_REPORT
-    auto vkDestroyDebugReportCallbackEXT = (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(VkContext.Instance, "vkDestroyDebugReportCallbackEXT");
+    VK_GET_INSTANCE_PROC_ADDR(vkDestroyDebugReportCallbackEXT);
     vkDestroyDebugReportCallbackEXT(VkContext.Instance, VkContext.DebugReport, VkContext.Allocator);
 #endif
     vkDestroyDevice(VkContext.Device, VkContext.Allocator);
@@ -796,7 +805,7 @@ void VulkanRenderer::RecreateSwapchainIfNecessary()
     if(Width > 0 && Height > 0)
     {
         ImGui_ImplVulkan_SetMinImageCount(MinImageCount);
-        CreateOrResizeWindow(Width, Height);
+        CreateOrResizeSwapChain(Width, Height);
         VkContext.FrameIndex = 0;
         SwapChainRebuild = false;
     }

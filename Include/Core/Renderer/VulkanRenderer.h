@@ -5,10 +5,12 @@
 #include <vulkan/vulkan.h>
 #include "Containers/DynamicArray.h"
 
-
 #ifdef _DEBUG
 #define APP_USE_VULKAN_DEBUG_REPORT
 #endif
+
+#define VK_GET_INSTANCE_PROC_ADDR(name) \
+    auto name = (PFN_##name)vkGetInstanceProcAddr(VkContext.Instance, #name);
 
 static void CheckVkResult(VkResult ErrorCode)
 {
@@ -98,11 +100,8 @@ namespace Ember
         void RecreateSwapchainIfNecessary();
         void FrameRender(ImDrawData* DrawData);
         void FramePresent();
-        void SetupVulkanWindow(VkSurfaceKHR Surface, int Width, int Height);
 
-        void CreateOrResizeWindow(int Width, int Height);
-        
-        void CreateSwapChain(int Width, int Height);
+        void CreateOrResizeSwapChain(int Width, int Height);
         void CreateCommandBuffers();
         
         void DestroyFrame(VkFrame* Frame) const;
@@ -113,6 +112,19 @@ namespace Ember
 
         static u32 GetMinImageCountFromPresentMode(VkPresentModeKHR PresentMode);
         static bool IsExtensionAvailable(const DynamicArray<VkExtensionProperties>& Properties, const char* Extension);
+
+        void CreateVulkanInstance();
+        void SelectGraphicsQueueFamily();
+        void CreatePhysicalDevice();
+        void CreateLogicalDevice();
+        void CreateDescriptorPool();
+        void CreateSurface();
+        void SetPresentMode();
+        
+        void InitializeImGui();
+
+    private:
+        void InternalCreateSwapChain(int Width, int Height);
 
     private:
         Window* Window = nullptr;
