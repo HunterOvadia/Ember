@@ -39,11 +39,6 @@ namespace Ember
         {
         }
 
-        ~Window()
-        {
-           TearDown();
-        }
-
         SDL_Window* Get() const { return SDLWindow; }
 
         bool Init();

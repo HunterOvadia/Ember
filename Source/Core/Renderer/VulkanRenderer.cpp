@@ -10,6 +10,8 @@ using namespace Ember;
 VulkanRenderer::VulkanRenderer(Ember::Window* Window)
     : Window(Window)
     , VkContext()
+    , MinImageCount(2)
+    , SwapChainRebuild(false)
 {
 }
 

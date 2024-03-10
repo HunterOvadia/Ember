@@ -44,6 +44,6 @@ namespace Ember
 
 	private:
 		bool bIsRunning;
-		Ember::UniquePtr<Ember::Window> Window;
+		Window* Window;
 	};
 }

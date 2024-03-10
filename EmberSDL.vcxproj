@@ -20,7 +20,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Include\Containers\DynamicArray.h" />
-    <ClInclude Include="Include\Containers\Memory\UniquePtr.h" />
     <ClInclude Include="Include\Containers\String.h" />
     <ClInclude Include="Include\Core\Application.h" />
     <ClInclude Include="Include\Core\Logging.h" />

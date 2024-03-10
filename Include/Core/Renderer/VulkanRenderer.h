@@ -142,10 +142,10 @@ namespace Ember
         void InternalCreateSwapChain(int Width, int Height);
 
     private:
-        Window* Window = nullptr;
+        Window* Window;
         VulkanContext VkContext;
         
-        u32 MinImageCount = 2;
-        bool SwapChainRebuild = false;
+        u32 MinImageCount;
+        bool SwapChainRebuild;
     };
 }

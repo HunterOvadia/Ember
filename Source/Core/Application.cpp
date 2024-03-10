@@ -20,7 +20,7 @@ bool Application::Init(const AppConfig& Config)
 		return false;
 	}
 
-	Window = Ember::MakeUnique<Ember::Window>(Config.WindowSettings);
+	Window = new Ember::Window(Config.WindowSettings);
 	if (!Window->Init())
 	{
 		EMBER_LOG(Critical, "Window Init Failure: %s", SDL_GetError());
@@ -33,7 +33,13 @@ bool Application::Init(const AppConfig& Config)
 
 void Application::TearDown()
 {
-	Window.Reset();
+	if(Window)
+	{
+		Window->TearDown();
+		delete Window;
+		Window = nullptr;
+	}
+	
 	bIsRunning = false;
 	SDL_Quit();
 }
