@@ -1,11 +1,10 @@
 ﻿#include "Core/Window.h"
 #include "Core/Logging.h"
-#include "Core/Renderer/ember_renderer_vulkan.h"
+#include "Core/Renderer/EmberRendererVulkan.h"
 
-bool EmberWindowInit(ember_window_t* Window, ember_window_settings_t Settings)
+bool EmberWindowInit(ember_window_t* Window, ember_window_settings_t WindowSettings)
 {
-	Window->Settings = Settings;
-	Window->Handle = SDL_CreateWindow(Settings.Title.CStr(), (int)Settings.PosX, (int)Settings.PosY, Settings.Width, Settings.Height, Settings.Flags);
+	Window->Handle = SDL_CreateWindow(WindowSettings.Title.CStr(), (int)WindowSettings.PosX, (int)WindowSettings.PosY, WindowSettings.Width, WindowSettings.Height, WindowSettings.Flags);
 	if(!Window->Handle)
 	{
 	    EMBER_LOG(Critical, "SDL_CreateWindow Failure: %s", SDL_GetError());

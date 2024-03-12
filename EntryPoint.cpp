@@ -6,7 +6,7 @@ int main(int ArgC, char** ArgV)
 	UNUSED_ARG(ArgV);
 
 	ember_app_t App = {};
-	ember_app_config_t Config;
+	ember_app_config_t Config = {};
 	Config.WindowSettings.Title = "Ember Editor";
 	Config.WindowSettings.PosX = SDL_WINDOWPOS_CENTERED;
 	Config.WindowSettings.PosY = SDL_WINDOWPOS_CENTERED;

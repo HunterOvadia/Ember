@@ -24,7 +24,7 @@
     <ClInclude Include="Include\Core\Application.h" />
     <ClInclude Include="Include\Core\Logging.h" />
     <ClInclude Include="Include\Core\Memory\Memory.h" />
-    <ClInclude Include="Include\Core\Renderer\ember_renderer_vulkan.h" />
+    <ClInclude Include="Include\Core\Renderer\EmberRendererVulkan.h" />
     <ClInclude Include="Include\Core\Window.h" />
     <ClInclude Include="Include\Ember.h" />
   </ItemGroup>
@@ -105,7 +105,7 @@
       <AdditionalIncludeDirectories>D:\CodingProjects\EmberSDL\third-party\include;D:\CodingProjects\EmberSDL\Include;</AdditionalIncludeDirectories>
       <LinkCompiled>true</LinkCompiled>
     </ClCompile>
-    <ClCompile Include="Source\Core\Renderer\ember_renderer_vulkan.cpp" />
+    <ClCompile Include="Source\Core\Renderer\EmberRendererVulkan.cpp" />
     <ClCompile Include="Source\Core\Window.cpp" />
     <ClCompile Include="third-party\include\Imgui\imgui.cpp" />
     <ClCompile Include="third-party\include\Imgui\imgui_demo.cpp" />

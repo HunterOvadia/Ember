@@ -20,7 +20,7 @@ inline void CheckVkResult(VkResult ErrorCode)
     EMBER_LOG(Error, "[Vulkan]: Error: VkResult = %d\n", ErrorCode);
     EMBER_ASSERT(false);
 }
-
+ 
 #ifdef APP_USE_VULKAN_DEBUG_REPORT
     inline VKAPI_ATTR VkBool32 VKAPI_CALL DebugReportFn(VkDebugReportFlagsEXT Flags, VkDebugReportObjectTypeEXT ObjectType, uint64_t Object, size_t Location, int32_t MessageCode, const char* pLayerPrefix, const char* pMessage, void* pUserData)
     {

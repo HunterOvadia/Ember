@@ -40,14 +40,12 @@ static void RenderFrame(ember_app_t* App)
 
 bool EmberAppInit(ember_app_t* App, ember_app_config_t Config)
 {
-    App->bIsRunning = false;
-    
     if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
     {
         EMBER_LOG(Critical, "SDL_Init Failure: %s", SDL_GetError());
         return false;
     }
-    
+
     if(!EmberWindowInit(&App->Window, Config.WindowSettings))
     {
         EMBER_LOG(Critical, "Window Init Failure: %s", SDL_GetError());
