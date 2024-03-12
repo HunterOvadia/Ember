@@ -1,103 +1,74 @@
 #include "Core/Application.h"
-
 #include <Imgui/imgui_impl_sdl2.h>
-
 #include "Core/Logging.h"
 
-using namespace Ember;
-
-Application::Application()
-	: bIsRunning(false)
-	, Window(nullptr)
+static void PollEvents(ember_app_t* App)
 {
+    SDL_Event E;
+    while (SDL_PollEvent(&E))
+    {
+        ImGui_ImplSDL2_ProcessEvent(&E);
+        switch(E.type)
+        {
+            case SDL_QUIT:
+            {
+                App->bIsRunning = false;
+            }
+            break;
+            default:
+            {
+            }
+            break;
+        }
+    }
 }
 
-bool Application::Init(const AppConfig& Config)
+static void UpdateFrame(ember_app_t* App)
 {
-	if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
-	{
-		EMBER_LOG(Critical, "SDL_Init Failure: %s", SDL_GetError());
-		return false;
-	}
-
-	Window = new Ember::Window(Config.WindowSettings);
-	if (!Window->Init())
-	{
-		EMBER_LOG(Critical, "Window Init Failure: %s", SDL_GetError());
-		return false;
-	}
-
-	bIsRunning = true;
-	return bIsRunning;
+    PollEvents(App);
+    // Game Update
 }
 
-void Application::TearDown()
+static void RenderFrame(ember_app_t* App)
 {
-	if(Window)
-	{
-		Window->TearDown();
-		delete Window;
-		Window = nullptr;
-	}
-	
-	bIsRunning = false;
-	SDL_Quit();
+    EmberWindowBeginFrame(&App->Window);
+    {
+        // Game Render
+    }
+    EmberWindowEndFrame(&App->Window);
 }
 
-void Application::Run()
+bool EmberAppInit(ember_app_t* App, ember_app_config_t Config)
 {
-	while (bIsRunning)
-	{
-		Update();
-		Render();
-	}
+    App->bIsRunning = false;
+    
+    if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
+    {
+        EMBER_LOG(Critical, "SDL_Init Failure: %s", SDL_GetError());
+        return false;
+    }
+    
+    if(!EmberWindowInit(&App->Window, Config.WindowSettings))
+    {
+        EMBER_LOG(Critical, "Window Init Failure: %s", SDL_GetError());
+        return false;
+    }
+
+    App->bIsRunning = true;
+    return App->bIsRunning;
 }
 
-void Application::Update()
+void EmberAppDestroy(ember_app_t* App)
 {
-	PollEvents();
+    EmberWindowDestroy(&App->Window);
+    SDL_Quit();
 }
 
-void Application::Render()
+void EmberAppRun(ember_app_t* App)
 {
-	RenderBegin();
-	{
-		// TODO(HO): Rendering
-	}
-	RenderEnd();
-}
-
-void Application::PollEvents()
-{
-	SDL_Event Event;
-	while (SDL_PollEvent(&Event))
-	{
-		ImGui_ImplSDL2_ProcessEvent(&Event);
-		switch (Event.type)
-		{
-			case SDL_QUIT:
-			{
-				bIsRunning = false;
-			}
-			break;
-
-			default: {} break;
-		}
-	}
-}
-
-void Application::RenderBegin()
-{
-	if(Window)
-	{
-		Window->RenderBegin();
-	}
-}
-
-void Application::RenderEnd()
-{
-	if(Window)
-	{
-		Window->RenderEnd();
-	}
+    while(App->bIsRunning)
+    {
+        UpdateFrame(App);
+        RenderFrame(App);
+    }
 }

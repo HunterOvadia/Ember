@@ -1,77 +1,75 @@
 ﻿#pragma once
 #include "Ember.h"
 
-namespace Ember
+template<typename T>
+class DynamicArray
 {
-    template<typename T>
-    class DynamicArray
+public:
+    DynamicArray() : Data(nullptr), InternalSize(0), InternalCapacity(0) {}
+    explicit DynamicArray(size_t InitialSize) : DynamicArray() { Resize(InitialSize); }
+    ~DynamicArray() { EmberMemoryFree(Data); }
+
+    void Resize(size_t NewSize)
     {
-    public:
-        DynamicArray() : Data(nullptr), InternalSize(0), InternalCapacity(0) {}
-        explicit DynamicArray(size_t InitialSize) : DynamicArray() { Resize(InitialSize); }
-        ~DynamicArray() { Memory::Free(Data); }
-
-        void Resize(size_t NewSize)
+        if(NewSize > InternalCapacity)
         {
-            if(NewSize > InternalCapacity)
-            {
-                Reserve(RequestReserveCapacityFromSize(NewSize));
-            }
-
-            InternalSize = NewSize;
+            Reserve(RequestReserveCapacityFromSize(NewSize));
         }
 
-        void Reserve(size_t NewCapacity)
+        InternalSize = NewSize;
+    }
+
+    void Reserve(size_t NewCapacity)
+    {
+        if(NewCapacity <= InternalCapacity)
         {
-            if(NewCapacity <= InternalCapacity)
-            {
-                return;
-            }
-
-            T* NewData = Memory::AllocateType<T>(NewCapacity);
-            if(Data)
-            {
-                Memory::Copy(NewData, Data, InternalSize * sizeof(T));
-                Memory::Free(Data);
-            }
-
-            Data = NewData;
-            InternalCapacity = NewCapacity;
+            return;
         }
 
-        void Add(const T& Value)
+        T* NewData = EmberMemoryAllocateType<T>(NewCapacity);
+        if(Data)
         {
-            if(InternalSize == InternalCapacity)
-            {
-                Reserve(RequestReserveCapacityFromSize(InternalSize + 1));
-            }
-            
-            Memory::Copy(&Data[InternalSize], &Value, sizeof(Value));
-            ++InternalSize;
+            EmberMemoryCopy(NewData, Data, InternalSize * sizeof(T));
+            EmberMemoryFree(Data);
         }
 
-        size_t Size() const { return InternalSize; }
-        T* GetData() const { return Data; }
+        Data = NewData;
+        InternalCapacity = NewCapacity;
+    }
 
-        T* begin() { return Data; }
-        const T* begin() const { return Data; }
+    void Add(const T& Value)
+    {
+        if(InternalSize == InternalCapacity)
+        {
+            Reserve(RequestReserveCapacityFromSize(InternalSize + 1));
+        }
         
-        T* end() { return Data + InternalSize; }
-        const T* end() const { return Data + InternalSize; }
+        EmberMemoryCopy(&Data[InternalSize], &Value, sizeof(Value));
+        ++InternalSize;
+    }
 
-        T& operator[](size_t Index) { EMBER_ASSERT(Index >= 0 && Index < InternalSize); return Data[Index]; }
-        const T& operator[](size_t Index) const { EMBER_ASSERT(Index >= 0 && Index < InternalSize); return Data[Index]; }
+    size_t Size() const { return InternalSize; }
+    T* GetData() const { return Data; }
 
-    private:
-        size_t RequestReserveCapacityFromSize(size_t RequestedSize) const
-        {
-            size_t NewCapacity = InternalCapacity > 0 ? (InternalCapacity + (InternalCapacity / 2)) : 8;
-            return NewCapacity > RequestedSize ? NewCapacity : RequestedSize;
-        }
+    T* begin() { return Data; }
+    const T* begin() const { return Data; }
+    
+    T* end() { return Data + InternalSize; }
+    const T* end() const { return Data + InternalSize; }
 
-    private:
-        T* Data;
-        size_t InternalSize;
-        size_t InternalCapacity;
-    };
-}
+    T& operator[](size_t Index) { EMBER_ASSERT(Index >= 0 && Index < InternalSize); return Data[Index]; }
+    const T& operator[](size_t Index) const { EMBER_ASSERT(Index >= 0 && Index < InternalSize); return Data[Index]; }
+
+private:
+    size_t RequestReserveCapacityFromSize(size_t RequestedSize) const
+    {
+        size_t NewCapacity = InternalCapacity > 0 ? (InternalCapacity + (InternalCapacity / 2)) : 8;
+        return NewCapacity > RequestedSize ? NewCapacity : RequestedSize;
+    }
+
+private:
+    T* Data;
+    size_t InternalSize;
+    size_t InternalCapacity;
+};
+

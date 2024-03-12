@@ -1,49 +1,17 @@
 #pragma once
 #include "Window.h"
 
-namespace Ember
+struct ember_app_config_t
 {
-	struct AppConfig
-	{
-		WindowSettings WindowSettings;
-		static AppConfig GetDefault(const String& TitleOverride = "")
-		{
-			static AppConfig Result =
-			{
-				.WindowSettings = WindowSettings::GetDefault()
-			};
+	ember_window_settings_t WindowSettings;
+};
 
-			if(TitleOverride.GetLength() > 0)
-			{
-				Result.WindowSettings.Title = TitleOverride.CStr();
-			}
+struct ember_app_t
+{
+	ember_window_t Window;
+	bool bIsRunning;
+};
 
-			return Result;
-		}
-	};
-
-	class Application
-	{
-	public:
-		Application();
-		~Application() = default;
-		Application(const Application& Other) = delete;
-		Application(Application&& Other) = delete;
-	
-		bool Init(const AppConfig& Config);
-		void TearDown();
-		void Run();
-
-	private:
-		void Update();
-		void Render();
-		void PollEvents();
-
-		void RenderBegin();
-		void RenderEnd();
-
-	private:
-		bool bIsRunning;
-		Window* Window;
-	};
-}
+bool EmberAppInit(ember_app_t* App, ember_app_config_t Config);
+void EmberAppDestroy(ember_app_t* App);
+void EmberAppRun(ember_app_t* App);

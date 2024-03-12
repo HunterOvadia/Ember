@@ -1,19 +1,18 @@
 ﻿#include "Core/Window.h"
 #include "Core/Logging.h"
-#include "Imgui/imgui.h"
-using namespace Ember;
+#include "Core/Renderer/ember_renderer_vulkan.h"
 
-bool Window::Init()
+bool EmberWindowInit(ember_window_t* Window, ember_window_settings_t Settings)
 {
-	SDLWindow = SDL_CreateWindow(Settings.Title.CStr(), Settings.PosX, Settings.PosY, Settings.Width, Settings.Height, Settings.Flags);
-	if(!SDLWindow)
+	Window->Settings = Settings;
+	Window->Handle = SDL_CreateWindow(Settings.Title.CStr(), (int)Settings.PosX, (int)Settings.PosY, Settings.Width, Settings.Height, Settings.Flags);
+	if(!Window->Handle)
 	{
 	    EMBER_LOG(Critical, "SDL_CreateWindow Failure: %s", SDL_GetError());
 	    return false;
 	}
 
-	Renderer = new VulkanRenderer(this);
-	if(!Renderer || !Renderer->Initialize())
+	if(!EmberRendererInit(&Window->Renderer, Window))
 	{
 		EMBER_LOG(Critical, "VulkanRenderer Create Failure!");
 		return false;
@@ -23,32 +22,22 @@ bool Window::Init()
 	return true;
 }
 
-void Window::TearDown()
+void EmberWindowDestroy(ember_window_t* Window)
 {
-	if(Renderer)
+	EmberRendererShutdown(&Window->Renderer);
+	if(Window->Handle)
 	{
-		Renderer->Shutdown();
-	}
-
-	if(SDLWindow)
-	{
-	    SDL_DestroyWindow(SDLWindow);
-	    SDLWindow = nullptr;
+	    SDL_DestroyWindow(Window->Handle);
+	    Window->Handle = nullptr;
 	}
 }
 
-void Window::RenderBegin()
+void EmberWindowBeginFrame(ember_window_t* Window)
 {
-	if(Renderer)
-	{
-		Renderer->BeginFrame();
-	}
+	EmberRendererBeginFrame(&Window->Renderer);
 }
 
-void Window::RenderEnd()
+void EmberWindowEndFrame(ember_window_t* Window)
 {
-	if(Renderer)
-	{
-		Renderer->EndFrame();
-	}
+	EmberRendererEndFrame(&Window->Renderer);
 }
