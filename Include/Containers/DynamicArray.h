@@ -48,6 +48,16 @@ public:
         ++InternalSize;
     }
 
+    void Empty()
+    {
+        if(Data)
+        {
+            InternalSize = InternalCapacity = 0;
+            EmberMemoryFree(Data);
+            Data = nullptr;
+        }
+    }
+
     size_t Size() const { return InternalSize; }
     T* GetData() const { return Data; }
 

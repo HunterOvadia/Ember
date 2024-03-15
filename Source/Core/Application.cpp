@@ -1,6 +1,7 @@
 #include "Core/Application.h"
 #include <Imgui/imgui_impl_sdl2.h>
 #include "Core/Logging.h"
+#include "Editor/EditorMenuBar.h"
 
 static void PollEvents(ember_app_t* App)
 {
@@ -12,7 +13,7 @@ static void PollEvents(ember_app_t* App)
         {
             case SDL_QUIT:
             {
-                App->bIsRunning = false;
+                App->State.IsRunning = false;
             }
             break;
             default:
@@ -23,17 +24,28 @@ static void PollEvents(ember_app_t* App)
     }
 }
 
+static void EmberAppUpdate(ember_app_t* App)
+{
+    // TODO(HO)
+}
+
+static void EmberAppRender(ember_app_t* App)
+{
+    ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
+    EditorMenuBarRender(App);
+}
+
 static void UpdateFrame(ember_app_t* App)
 {
     PollEvents(App);
-    // Game Update
+    EmberAppUpdate(App);
 }
 
 static void RenderFrame(ember_app_t* App)
 {
     EmberWindowBeginFrame(&App->Window);
     {
-        // Game Render
+        EmberAppRender(App);
     }
     EmberWindowEndFrame(&App->Window);
 }
@@ -51,9 +63,9 @@ bool EmberAppInit(ember_app_t* App, ember_app_config_t Config)
         EMBER_LOG(Critical, "Window Init Failure: %s", SDL_GetError());
         return false;
     }
-
-    App->bIsRunning = true;
-    return App->bIsRunning;
+    
+    App->State.IsRunning = true;
+    return App->State.IsRunning;
 }
 
 void EmberAppDestroy(ember_app_t* App)
@@ -64,9 +76,10 @@ void EmberAppDestroy(ember_app_t* App)
 
 void EmberAppRun(ember_app_t* App)
 {
-    while(App->bIsRunning)
+    while(App->State.IsRunning)
     {
         UpdateFrame(App);
         RenderFrame(App);
     }
 }
+

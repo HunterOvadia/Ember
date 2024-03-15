@@ -26,6 +26,7 @@
     <ClInclude Include="Include\Core\Memory\Memory.h" />
     <ClInclude Include="Include\Core\Renderer\EmberRendererVulkan.h" />
     <ClInclude Include="Include\Core\Window.h" />
+    <ClInclude Include="Include\Editor\EditorMenuBar.h" />
     <ClInclude Include="Include\Ember.h" />
   </ItemGroup>
   <ItemGroup>
@@ -107,6 +108,7 @@
     </ClCompile>
     <ClCompile Include="Source\Core\Renderer\EmberRendererVulkan.cpp" />
     <ClCompile Include="Source\Core\Window.cpp" />
+    <ClCompile Include="Source\Editor\EditorMenuBar.cpp" />
     <ClCompile Include="third-party\include\Imgui\imgui.cpp" />
     <ClCompile Include="third-party\include\Imgui\imgui_demo.cpp" />
     <ClCompile Include="third-party\include\Imgui\imgui_draw.cpp" />

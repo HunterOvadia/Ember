@@ -7,20 +7,19 @@
 #include <Containers/DynamicArray.h>
 
 // TODO(HO): If we ever move away from SDL, we will need to remove the SDL properties
-using namespace ImGui;
 
 static void ImGui_Initialize(ember_renderer_vulkan_t* Renderer, ember_window_t* Window)
 {
     IMGUI_CHECKVERSION();
-    CreateContext();
-    ImGuiIO& Io = GetIO(); (void)Io;
+    ImGui::CreateContext();
+    ImGuiIO& Io = ImGui::GetIO(); (void)Io;
     Io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     Io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
     Io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     Io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
-    StyleColorsDark();
+    ImGui::StyleColorsDark();
 
-    ImGuiStyle& Style = GetStyle();
+    ImGuiStyle& Style = ImGui::GetStyle();
     if(Io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
     {
         Style.WindowRounding = 0.0f;
@@ -702,7 +701,7 @@ void EmberRendererShutdown(ember_renderer_vulkan_t* Renderer)
     CheckVkResult(vkDeviceWaitIdle(Renderer->Context.Device));
     ImGui_ImplVulkan_Shutdown();
     ImGui_ImplSDL2_Shutdown();
-	DestroyContext();
+	ImGui::DestroyContext();
     
     DestroyFrames(Renderer);
     
@@ -740,24 +739,18 @@ static void ImGui_BeginFrame()
 {
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplSDL2_NewFrame();
-    NewFrame();
+    ImGui::NewFrame();
 }
 
 void EmberRendererBeginFrame(ember_renderer_vulkan_t* Renderer)
 {
     RecreateSwapchainIfNecessary(Renderer);
     ImGui_BeginFrame();
-
-    bool ShowDemoWindow = true;
-    if(ShowDemoWindow)
-    {
-        ImGui::ShowDemoWindow(&ShowDemoWindow);
-    }
 }
 
 void ImGui_EndFrame()
 {
-    Render();
+    ImGui::Render();
 }
 
 static void FrameRender(ember_renderer_vulkan_t* Renderer, ImDrawData* DrawData)
@@ -818,16 +811,16 @@ void EmberRendererEndFrame(ember_renderer_vulkan_t* Renderer)
 {
     ImGui_EndFrame();
     
-    ImDrawData* MainDrawData = GetDrawData();
+    ImDrawData* MainDrawData = ImGui::GetDrawData();
     const bool IsMinimized = (MainDrawData->DisplaySize.x <= 0.0f || MainDrawData->DisplaySize.y <= 0.0f);
     if(!IsMinimized)
     {
         FrameRender(Renderer, MainDrawData);
 
-        if(GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+        if(ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
         {
-            UpdatePlatformWindows();
-            RenderPlatformWindowsDefault();
+            ImGui::UpdatePlatformWindows();
+            ImGui::RenderPlatformWindowsDefault();
         }
         
         FramePresent(Renderer);
