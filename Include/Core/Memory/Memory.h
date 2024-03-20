@@ -9,9 +9,14 @@ inline void* EmberMemoryAllocate(size_t Size)
     return malloc(Size);
 }
 
+inline void EmberMemorySet(void* Dest, int Val, size_t Size)
+{
+    memset(Dest, Val, Size);
+}
+
 inline void EmberMemoryZero(void* Dest, size_t Size)
 {
-    memset(Dest, 0, Size);
+    EmberMemorySet(Dest, 0, Size);
 }
 
 template<typename T, bool ZeroMem = false>

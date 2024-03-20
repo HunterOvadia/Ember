@@ -10,6 +10,8 @@
 // Platform Main
 bool EmberPlatformInit(platform_t* Platform)
 {
+    UNUSED_ARG(Platform);
+    
     if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
     {
         EMBER_LOG(Critical, "SDL_Init Failure: %s", SDL_GetError());
@@ -21,11 +23,14 @@ bool EmberPlatformInit(platform_t* Platform)
 
 void EmberPlatformShutdown(platform_t* Platform)
 {
+    UNUSED_ARG(Platform);
     SDL_Quit();
 }
 
 void EmberPlatformPollEvents(platform_t* Platform, ember_app_t* App)
 {
+    UNUSED_ARG(Platform);
+    
     SDL_Event E;
     while (SDL_PollEvent(&E))
     {
