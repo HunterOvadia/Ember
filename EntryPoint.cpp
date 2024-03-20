@@ -1,3 +1,4 @@
+#include <SDL/SDL_video.h>
 #include "Core/Application.h"
 
 int main(int ArgC, char** ArgV)

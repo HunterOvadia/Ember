@@ -1,4 +1,7 @@
-﻿#include "Core/Renderer/Renderer.h"
+﻿#include "Ember.h"
+
+#ifdef RENDERER_VULKAN
+#include "Core/Renderer/Renderer.h"
 #include "Core/Renderer/Renderer_Vulkan.h"
 #include "Core/Window.h"
 #include "Core/Memory/Memory.h"
@@ -823,3 +826,4 @@ void EmberRendererImGuiShutdown()
 {
     ImGui_ImplVulkan_Shutdown();
 }
+#endif

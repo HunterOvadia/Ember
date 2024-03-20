@@ -1,5 +1,6 @@
 #pragma once
-#include "Ember.h"
+#include <SDL/SDL_log.h>
+
 enum ELogCategory
 {
 	Verbose,

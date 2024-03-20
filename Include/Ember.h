@@ -1,6 +1,9 @@
 #pragma once
 #include <cstdint>
-#include <SDL/SDL.h>
+
+// TODO(HO): Configure based on actual Platform, once we add more. SDL is the initial Platform Layer for now.
+#define PLATFORM_SDL
+#define RENDERER_VULKAN
 
 // Type definitions for signed integers
 typedef int8_t     s8;
@@ -27,3 +30,4 @@ typedef uint64_t    u64;
     } while (false);
 
 #define ARRAY_SIZE(arr) (sizeof((arr)) / sizeof((arr)[0]))
+

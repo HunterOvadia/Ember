@@ -1,4 +1,7 @@
-﻿#include "Core/Platform/Platform.h"
+﻿#include "Ember.h"
+
+#ifdef PLATFORM_SDL
+#include "Core/Platform/Platform.h"
 #include "Core/Logging.h"
 #include "Core/Application.h"
 #include <SDL/SDL.h>
@@ -107,3 +110,4 @@ bool EmberPlatformRendererCreateVulkanSurface(ember_renderer_vulkan_t* Renderer,
 {
     return SDL_Vulkan_CreateSurface((SDL_Window*)Window->Handle, Renderer->Context.Instance, &Renderer->Context.Surface);
 }
+#endif
