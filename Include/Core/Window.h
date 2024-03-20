@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include "Ember.h"
-#include "Renderer/EmberRendererVulkan.h"
+#include "Containers/String.h"
+#include "Renderer/Renderer.h"
 
 struct ember_window_settings_t
 {
@@ -14,8 +15,8 @@ struct ember_window_settings_t
 
 struct ember_window_t
 {
-    SDL_Window* Handle;
-    ember_renderer_vulkan_t Renderer;
+    void* Handle;
+    ember_renderer_t Renderer;
 };
 
 bool EmberWindowInit(ember_window_t* Window, ember_window_settings_t WindowSettings);

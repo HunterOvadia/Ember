@@ -1,5 +1,7 @@
 ﻿#pragma once
 #include "Ember.h"
+#include "Core/Logging.h"
+#include "Core/Memory/Memory.h"
 
 template<typename T>
 class DynamicArray

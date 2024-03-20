@@ -8,7 +8,7 @@
 #define APP_USE_VULKAN_DEBUG_REPORT
 #endif
 
-#define VK_GET_INSTANCE_PROC_ADDR(name) auto (name) = (PFN_##name)vkGetInstanceProcAddr(Renderer->Context.Instance, #name);
+#define VK_GET_INSTANCE_PROC_ADDR(name, instance) auto (name) = (PFN_##name)vkGetInstanceProcAddr(instance, #name);
 
 inline void CheckVkResult(VkResult ErrorCode)
 {
@@ -58,8 +58,8 @@ struct vk_context
     VkPipelineCache             PipelineCache = nullptr;
     VkDescriptorPool            DescriptorPool = nullptr;
 
-    int                         Width;
-    int                         Height;
+    u32                         Width;
+    u32                         Height;
     VkSwapchainKHR              Swapchain;
     VkSurfaceKHR                Surface;
     VkSurfaceFormatKHR          SurfaceFormat;
@@ -74,16 +74,9 @@ struct vk_context
     vk_semaphores_t*               Semaphores;
 };
 
-struct ember_window_t;
 struct ember_renderer_vulkan_t
 {
-    ember_window_t* Window;
     vk_context Context;
     u32 MinImageCount;
     bool SwapChainRebuild;
 };
-
-bool EmberRendererInit(ember_renderer_vulkan_t* Renderer, ember_window_t* Window);
-void EmberRendererShutdown(ember_renderer_vulkan_t* Renderer);
-void EmberRendererBeginFrame(ember_renderer_vulkan_t* Renderer);
-void EmberRendererEndFrame(ember_renderer_vulkan_t* Renderer);

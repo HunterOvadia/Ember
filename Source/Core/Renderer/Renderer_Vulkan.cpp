@@ -1,52 +1,10 @@
-﻿#include "Core/Renderer/EmberRendererVulkan.h"
-#include <Imgui/imgui_impl_sdl2.h>
-#include <SDL/SDL_vulkan.h>
+﻿#include "Core/Renderer/Renderer.h"
+#include "Core/Renderer/Renderer_Vulkan.h"
 #include "Core/Window.h"
 #include "Core/Memory/Memory.h"
 #include "Imgui/imgui.h"
-#include <Containers/DynamicArray.h>
-
-// TODO(HO): If we ever move away from SDL, we will need to remove the SDL properties
-
-static void ImGui_Initialize(ember_renderer_vulkan_t* Renderer, ember_window_t* Window)
-{
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& Io = ImGui::GetIO(); (void)Io;
-    Io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    Io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
-    Io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-    Io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
-    ImGui::StyleColorsDark();
-
-    ImGuiStyle& Style = ImGui::GetStyle();
-    if(Io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
-    {
-        Style.WindowRounding = 0.0f;
-        Style.Colors[ImGuiCol_WindowBg].w = 1.0f;
-    }
-
-    EMBER_ASSERT(Renderer->MinImageCount >= 2);
-    ImGui_ImplSDL2_InitForVulkan(Window->Handle);
-    ImGui_ImplVulkan_InitInfo InitInfo = {
-        .Instance = Renderer->Context.Instance,
-        .PhysicalDevice = Renderer->Context.PhysicalDevice,
-        .Device = Renderer->Context.Device,
-        .QueueFamily = Renderer->Context.QueueFamily,
-        .Queue = Renderer->Context.Queue,
-        .DescriptorPool = Renderer->Context.DescriptorPool,
-        .RenderPass = Renderer->Context.RenderPass,
-        .MinImageCount = Renderer->MinImageCount,
-        .ImageCount = Renderer->Context.ImageCount,
-        .MSAASamples = VK_SAMPLE_COUNT_1_BIT,
-        .PipelineCache = Renderer->Context.PipelineCache,
-        .Subpass = 0,
-        .Allocator = Renderer->Context.Allocator,
-        .CheckVkResultFn = CheckVkResult
-    };
-    
-    ImGui_ImplVulkan_Init(&InitInfo);
-}
+#include "Containers/DynamicArray.h"
+#include "Core/Platform/Platform.h"
 
 static bool IsExtensionAvailable(const DynamicArray<VkExtensionProperties>& Properties, const char* Extension)
 {
@@ -288,13 +246,10 @@ static void DestroyFrames(ember_renderer_vulkan_t* Renderer)
     }
 }
 
-static void CreateVulkanInstance(ember_renderer_vulkan_t* Renderer)
+static void CreateVulkanInstance(ember_renderer_t* Renderer, ember_window_t* Window)
 {
-    u32 ExtensionsCount = 0;
-    SDL_Vulkan_GetInstanceExtensions(Renderer->Window->Handle, &ExtensionsCount, nullptr);
-
-    DynamicArray<const char*> Extensions(ExtensionsCount);
-    SDL_Vulkan_GetInstanceExtensions(Renderer->Window->Handle, &ExtensionsCount, Extensions.GetData());
+    ember_renderer_vulkan_t* VkRenderer = (ember_renderer_vulkan_t*)Renderer->Internal;
+    DynamicArray<const char*> Extensions = EmberPlatformRendererVulkanGetInstanceExtensions(Window);
     
     VkInstanceCreateInfo CreateInfo = {
         .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO
@@ -328,10 +283,10 @@ static void CreateVulkanInstance(ember_renderer_vulkan_t* Renderer)
 
     CreateInfo.enabledExtensionCount = (u32)Extensions.Size();
     CreateInfo.ppEnabledExtensionNames = Extensions.GetData();
-    CheckVkResult(vkCreateInstance(&CreateInfo, Renderer->Context.Allocator, &Renderer->Context.Instance));
+    CheckVkResult(vkCreateInstance(&CreateInfo, VkRenderer->Context.Allocator, &VkRenderer->Context.Instance));
 
 #ifdef APP_USE_VULKAN_DEBUG_REPORT
-    VK_GET_INSTANCE_PROC_ADDR(vkCreateDebugReportCallbackEXT);
+    VK_GET_INSTANCE_PROC_ADDR(vkCreateDebugReportCallbackEXT, VkRenderer->Context.Instance);
     EMBER_ASSERT(vkCreateDebugReportCallbackEXT != nullptr);
     VkDebugReportCallbackCreateInfoEXT DebugReportCreateInfo =
     {
@@ -340,7 +295,7 @@ static void CreateVulkanInstance(ember_renderer_vulkan_t* Renderer)
         .pfnCallback = DebugReportFn,
         .pUserData = nullptr
     };
-    CheckVkResult(vkCreateDebugReportCallbackEXT(Renderer->Context.Instance, &DebugReportCreateInfo, Renderer->Context.Allocator, &Renderer->Context.DebugReport));
+    CheckVkResult(vkCreateDebugReportCallbackEXT(VkRenderer->Context.Instance, &DebugReportCreateInfo, VkRenderer->Context.Allocator, &VkRenderer->Context.DebugReport));
 #endif
 }
 
@@ -485,16 +440,17 @@ static VkSurfaceFormatKHR SelectSurfaceFormat(ember_renderer_vulkan_t* Renderer,
     return AvailableFormats[0];
 }
 
-static void CreateSurface(ember_renderer_vulkan_t* Renderer)
+static void CreateSurface(ember_renderer_t* Renderer, ember_window_t* Window)
 {
-    if(SDL_Vulkan_CreateSurface(Renderer->Window->Handle, Renderer->Context.Instance, &Renderer->Context.Surface) == 0)
+    ember_renderer_vulkan_t* VkRenderer = (ember_renderer_vulkan_t*)Renderer->Internal;
+    if(EmberPlatformRendererCreateVulkanSurface(VkRenderer, Window) == 0)
     {
         EMBER_LOG(Error, "Failed to create Vulkan Surface!");
         return;
     }
     
     VkBool32 Res;
-    vkGetPhysicalDeviceSurfaceSupportKHR(Renderer->Context.PhysicalDevice, Renderer->Context.QueueFamily, Renderer->Context.Surface, &Res);
+    vkGetPhysicalDeviceSurfaceSupportKHR(VkRenderer->Context.PhysicalDevice, VkRenderer->Context.QueueFamily, VkRenderer->Context.Surface, &Res);
     if(Res != VK_TRUE)
     {
         EMBER_LOG(Error, "[Vulkan]: No WSI Support on Physical Device 0");
@@ -503,7 +459,7 @@ static void CreateSurface(ember_renderer_vulkan_t* Renderer)
 
     constexpr VkFormat RequestSurfaceImageFormat[] = { VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_B8G8R8_UNORM, VK_FORMAT_R8G8B8_UNORM };
     constexpr VkColorSpaceKHR RequestSurfaceColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
-    Renderer->Context.SurfaceFormat = SelectSurfaceFormat(Renderer, RequestSurfaceImageFormat, ARRAY_SIZE(RequestSurfaceImageFormat), RequestSurfaceColorSpace);
+    VkRenderer->Context.SurfaceFormat = SelectSurfaceFormat(VkRenderer, RequestSurfaceImageFormat, ARRAY_SIZE(RequestSurfaceImageFormat), RequestSurfaceColorSpace);
 }
 
 static VkPresentModeKHR SelectPresentMode(ember_renderer_vulkan_t* Renderer, VkPresentModeKHR* RequestModes, int RequestModesCount)
@@ -565,7 +521,7 @@ static u32 GetMinImageCountFromPresentMode(VkPresentModeKHR PresentMode)
     }
 }
 
-void InternalCreateSwapChain(ember_renderer_vulkan_t* Renderer, int Width, int Height)
+void InternalCreateSwapChain(ember_renderer_vulkan_t* Renderer, u32 Width, u32 Height)
 {
     VkSwapchainKHR OldSwapchain = Renderer->Context.Swapchain;
 
@@ -612,8 +568,8 @@ void InternalCreateSwapChain(ember_renderer_vulkan_t* Renderer, int Width, int H
     }
     else
     {
-        Info.imageExtent.width = Renderer->Context.Width = (int)Capabilities.currentExtent.width;
-        Info.imageExtent.height = Renderer->Context.Height = (int)Capabilities.currentExtent.height;
+        Info.imageExtent.width = Renderer->Context.Width = Capabilities.currentExtent.width;
+        Info.imageExtent.height = Renderer->Context.Height = Capabilities.currentExtent.height;
     }
 
     CheckVkResult(vkCreateSwapchainKHR(Renderer->Context.Device, &Info, Renderer->Context.Allocator, &Renderer->Context.Swapchain));
@@ -626,10 +582,8 @@ void InternalCreateSwapChain(ember_renderer_vulkan_t* Renderer, int Width, int H
 
     EMBER_ASSERT(Renderer->Context.Frames == nullptr && Renderer->Context.Semaphores == nullptr);
     Renderer->Context.SemaphoreCount = (Renderer->Context.ImageCount + 1);
-    Renderer->Context.Frames = EmberMemoryAllocateType<vk_frame_t>(Renderer->Context.ImageCount);
-    Renderer->Context.Semaphores = EmberMemoryAllocateType<vk_semaphores_t>(Renderer->Context.SemaphoreCount);
-    EmberMemoryZero(Renderer->Context.Frames, sizeof(Renderer->Context.Frames[0]) * Renderer->Context.ImageCount);
-    EmberMemoryZero(Renderer->Context.Semaphores, sizeof(Renderer->Context.Semaphores[0]) * Renderer->Context.SemaphoreCount);
+    Renderer->Context.Frames = EmberMemoryAllocateType<vk_frame_t, true>(Renderer->Context.ImageCount);
+    Renderer->Context.Semaphores = EmberMemoryAllocateType<vk_semaphores_t, true>(Renderer->Context.SemaphoreCount);
     for(u32 i = 0; i < Renderer->Context.ImageCount; ++i)
     {
         Renderer->Context.Frames[i].Backbuffer = Backbuffers[i];
@@ -696,61 +650,25 @@ static void CreateOrResizeSwapChain(ember_renderer_vulkan_t* Renderer, int Width
     CreateCommandBuffers(Renderer);
 }
 
-void EmberRendererShutdown(ember_renderer_vulkan_t* Renderer)
+static void RecreateSwapchainIfNecessary(ember_renderer_t* Renderer, ember_window_t* Window)
 {
-    CheckVkResult(vkDeviceWaitIdle(Renderer->Context.Device));
-    ImGui_ImplVulkan_Shutdown();
-    ImGui_ImplSDL2_Shutdown();
-	ImGui::DestroyContext();
-    
-    DestroyFrames(Renderer);
-    
-    vkDestroySwapchainKHR(Renderer->Context.Device, Renderer->Context.Swapchain, Renderer->Context.Allocator);
-    vkDestroySurfaceKHR(Renderer->Context.Instance, Renderer->Context.Surface, Renderer->Context.Allocator);
-    
-    vkDestroyDescriptorPool(Renderer->Context.Device, Renderer->Context.DescriptorPool, Renderer->Context.Allocator);
-#ifdef APP_USE_VULKAN_DEBUG_REPORT
-    VK_GET_INSTANCE_PROC_ADDR(vkDestroyDebugReportCallbackEXT);
-    vkDestroyDebugReportCallbackEXT(Renderer->Context.Instance, Renderer->Context.DebugReport, Renderer->Context.Allocator);
-#endif
-    vkDestroyDevice(Renderer->Context.Device, Renderer->Context.Allocator);
-    vkDestroyInstance(Renderer->Context.Instance, Renderer->Context.Allocator);
-}
-
-static void RecreateSwapchainIfNecessary(ember_renderer_vulkan_t* Renderer)
-{
-    if(!Renderer->SwapChainRebuild)
+    ember_renderer_vulkan_t* VkRenderer = (ember_renderer_vulkan_t*)Renderer->Internal;
+    if(!VkRenderer->SwapChainRebuild)
     {
         return;
     }
     
-    int Width, Height;
-    SDL_GetWindowSize(Renderer->Window->Handle, &Width, &Height);
-    if(Width > 0 && Height > 0)
+    u32 Width, Height;
+    if(EmberPlatformGetWindowSize(Window, &Width, &Height))
     {
-        ImGui_ImplVulkan_SetMinImageCount(Renderer->MinImageCount);
-        CreateOrResizeSwapChain(Renderer, Width, Height);
-        Renderer->Context.FrameIndex = 0;
-        Renderer->SwapChainRebuild = false;
+        if(Width > 0 && Height > 0)
+        {
+            ImGui_ImplVulkan_SetMinImageCount(VkRenderer->MinImageCount);
+            CreateOrResizeSwapChain(VkRenderer, Width, Height);
+            VkRenderer->Context.FrameIndex = 0;
+            VkRenderer->SwapChainRebuild = false;
+        }
     }
-}
-
-static void ImGui_BeginFrame()
-{
-    ImGui_ImplVulkan_NewFrame();
-    ImGui_ImplSDL2_NewFrame();
-    ImGui::NewFrame();
-}
-
-void EmberRendererBeginFrame(ember_renderer_vulkan_t* Renderer)
-{
-    RecreateSwapchainIfNecessary(Renderer);
-    ImGui_BeginFrame();
-}
-
-void ImGui_EndFrame()
-{
-    ImGui::Render();
 }
 
 static void FrameRender(ember_renderer_vulkan_t* Renderer, ImDrawData* DrawData)
@@ -807,15 +725,62 @@ static void FramePresent(ember_renderer_vulkan_t* Renderer)
     Renderer->Context.SemaphoreIndex = (Renderer->Context.SemaphoreIndex + 1) % Renderer->Context.SemaphoreCount;
 }
 
-void EmberRendererEndFrame(ember_renderer_vulkan_t* Renderer)
+bool EmberRendererInit(ember_renderer_t* Renderer, ember_window_t* Window)
 {
-    ImGui_EndFrame();
+    Renderer->Internal = EmberMemoryAllocateType<ember_renderer_vulkan_t, true>();
+
+    ember_renderer_vulkan_t* VkRenderer = (ember_renderer_vulkan_t*)Renderer->Internal;
+    CreateVulkanInstance(Renderer, Window);
+    CreatePhysicalDevice(VkRenderer);
+    SelectGraphicsQueueFamily(VkRenderer);
+    CreateLogicalDevice(VkRenderer);
+    CreateDescriptorPool(VkRenderer);
+    CreateSurface(Renderer, Window);
+    SetPresentMode(VkRenderer);
+
+    u32 Width, Height;
+    if(EmberPlatformGetWindowSize(Window, &Width, &Height))
+    {
+        CreateOrResizeSwapChain(VkRenderer, (int)Width, (int)Height);
+    }
     
+    return true;
+}
+
+void EmberRendererShutdown(ember_renderer_t* Renderer)
+{
+    ember_renderer_vulkan_t* VkRenderer = (ember_renderer_vulkan_t*)Renderer->Internal;
+
+    CheckVkResult(vkDeviceWaitIdle(VkRenderer->Context.Device));
+    
+    DestroyFrames(VkRenderer);
+    
+    vkDestroySwapchainKHR(VkRenderer->Context.Device, VkRenderer->Context.Swapchain, VkRenderer->Context.Allocator);
+    vkDestroySurfaceKHR(VkRenderer->Context.Instance, VkRenderer->Context.Surface, VkRenderer->Context.Allocator);
+    
+    vkDestroyDescriptorPool(VkRenderer->Context.Device, VkRenderer->Context.DescriptorPool, VkRenderer->Context.Allocator);
+#ifdef APP_USE_VULKAN_DEBUG_REPORT
+    VK_GET_INSTANCE_PROC_ADDR(vkDestroyDebugReportCallbackEXT, VkRenderer->Context.Instance);
+    vkDestroyDebugReportCallbackEXT(VkRenderer->Context.Instance, VkRenderer->Context.DebugReport, VkRenderer->Context.Allocator);
+#endif
+    vkDestroyDevice(VkRenderer->Context.Device, VkRenderer->Context.Allocator);
+    vkDestroyInstance(VkRenderer->Context.Instance, VkRenderer->Context.Allocator);
+}
+
+void EmberRendererBeginFrame(ember_renderer_t* Renderer, ember_window_t* Window)
+{
+    RecreateSwapchainIfNecessary(Renderer, Window);
+    ImGui_ImplVulkan_NewFrame();
+}
+
+void EmberRendererEndFrame(ember_renderer_t* Renderer)
+{
     ImDrawData* MainDrawData = ImGui::GetDrawData();
     const bool IsMinimized = (MainDrawData->DisplaySize.x <= 0.0f || MainDrawData->DisplaySize.y <= 0.0f);
     if(!IsMinimized)
     {
-        FrameRender(Renderer, MainDrawData);
+        ember_renderer_vulkan_t* VkRenderer = (ember_renderer_vulkan_t*)Renderer->Internal;
+        FrameRender(VkRenderer, MainDrawData);
 
         if(ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
         {
@@ -823,26 +788,38 @@ void EmberRendererEndFrame(ember_renderer_vulkan_t* Renderer)
             ImGui::RenderPlatformWindowsDefault();
         }
         
-        FramePresent(Renderer);
+        FramePresent(VkRenderer);
     }
 }
 
-bool EmberRendererInit(ember_renderer_vulkan_t* Renderer, ember_window_t* Window)
+bool EmberRendererImGuiInit(ember_renderer_t* Renderer)
 {
-    Renderer->Window = Window;
+    EMBER_ASSERT(Renderer);
     
-    CreateVulkanInstance(Renderer);
-    CreatePhysicalDevice(Renderer);
-    SelectGraphicsQueueFamily(Renderer);
-    CreateLogicalDevice(Renderer);
-    CreateDescriptorPool(Renderer);
-    CreateSurface(Renderer);
-    SetPresentMode(Renderer);
+    ember_renderer_vulkan_t* VkRenderer = (ember_renderer_vulkan_t*)Renderer->Internal;
+    EMBER_ASSERT(VkRenderer->MinImageCount >= 2);
+    
+    ImGui_ImplVulkan_InitInfo InitInfo = {
+        .Instance = VkRenderer->Context.Instance,
+        .PhysicalDevice = VkRenderer->Context.PhysicalDevice,
+        .Device = VkRenderer->Context.Device,
+        .QueueFamily = VkRenderer->Context.QueueFamily,
+        .Queue = VkRenderer->Context.Queue,
+        .DescriptorPool = VkRenderer->Context.DescriptorPool,
+        .RenderPass = VkRenderer->Context.RenderPass,
+        .MinImageCount = VkRenderer->MinImageCount,
+        .ImageCount = VkRenderer->Context.ImageCount,
+        .MSAASamples = VK_SAMPLE_COUNT_1_BIT,
+        .PipelineCache = VkRenderer->Context.PipelineCache,
+        .Subpass = 0,
+        .Allocator = VkRenderer->Context.Allocator,
+        .CheckVkResultFn = CheckVkResult
+    };
+    
+    return ImGui_ImplVulkan_Init(&InitInfo);
+}
 
-    int Width, Height;
-    SDL_GetWindowSize(Window->Handle, &Width, &Height);
-    CreateOrResizeSwapChain(Renderer, Width, Height);
-    
-    ImGui_Initialize(Renderer, Window);
-    return true;
+void EmberRendererImGuiShutdown()
+{
+    ImGui_ImplVulkan_Shutdown();
 }

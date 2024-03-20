@@ -1,4 +1,6 @@
 ﻿#pragma once
+#include "Core/Memory/Memory.h"
+
 static size_t CStringLength(const char* String)
 {
     const char* Temp = String;

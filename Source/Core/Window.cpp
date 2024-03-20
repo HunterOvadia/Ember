@@ -1,19 +1,13 @@
 ﻿#include "Core/Window.h"
 #include "Core/Logging.h"
-#include "Core/Renderer/EmberRendererVulkan.h"
+#include "Core/Platform/Platform.h"
+#include "Core/Renderer/Renderer_Vulkan.h"
 
 bool EmberWindowInit(ember_window_t* Window, ember_window_settings_t WindowSettings)
 {
-	Window->Handle = SDL_CreateWindow(WindowSettings.Title.CStr(), (int)WindowSettings.PosX, (int)WindowSettings.PosY, WindowSettings.Width, WindowSettings.Height, WindowSettings.Flags);
-	if(!Window->Handle)
+	if(!EmberPlatformCreateWindow(WindowSettings, &Window->Handle))
 	{
-	    EMBER_LOG(Critical, "SDL_CreateWindow Failure: %s", SDL_GetError());
-	    return false;
-	}
-
-	if(!EmberRendererInit(&Window->Renderer, Window))
-	{
-		EMBER_LOG(Critical, "VulkanRenderer Create Failure!");
+		EMBER_LOG(Critical, "EmberPlatformCreateWindow Failure: %s");
 		return false;
 	}
 
@@ -23,20 +17,5 @@ bool EmberWindowInit(ember_window_t* Window, ember_window_settings_t WindowSetti
 
 void EmberWindowDestroy(ember_window_t* Window)
 {
-	EmberRendererShutdown(&Window->Renderer);
-	if(Window->Handle)
-	{
-	    SDL_DestroyWindow(Window->Handle);
-	    Window->Handle = nullptr;
-	}
-}
-
-void EmberWindowBeginFrame(ember_window_t* Window)
-{
-	EmberRendererBeginFrame(&Window->Renderer);
-}
-
-void EmberWindowEndFrame(ember_window_t* Window)
-{
-	EmberRendererEndFrame(&Window->Renderer);
+	EmberPlatformDestroyWindow(Window);
 }

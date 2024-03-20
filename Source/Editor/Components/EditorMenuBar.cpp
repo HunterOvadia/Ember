@@ -1,5 +1,4 @@
 ﻿#include "Editor/EditorMenuBar.h"
-
 #include <Imgui/imgui.h>
 
 void EditorMenuBarRender(ember_app_t* App)

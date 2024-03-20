@@ -1,7 +1,5 @@
 #pragma once
 #include <cstdint>
-#include "Core/Memory/Memory.h"
-#include "Containers/String.h"
 #include <SDL/SDL.h>
 
 // Type definitions for signed integers
