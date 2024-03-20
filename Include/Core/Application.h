@@ -16,6 +16,7 @@ struct ember_app_t
 {
 	platform_t Platform;
 	ember_window_t Window;
+	ember_renderer_t Renderer;
 	app_state_t State;
 };
 

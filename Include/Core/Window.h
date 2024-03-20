@@ -16,10 +16,7 @@ struct ember_window_settings_t
 struct ember_window_t
 {
     void* Handle;
-    ember_renderer_t Renderer;
 };
 
 bool EmberWindowInit(ember_window_t* Window, ember_window_settings_t WindowSettings);
 void EmberWindowDestroy(ember_window_t* Window);
-void EmberWindowBeginFrame(ember_window_t* Window);
-void EmberWindowEndFrame(ember_window_t* Window);

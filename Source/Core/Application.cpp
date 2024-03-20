@@ -1,7 +1,7 @@
 #include "Core/Application.h"
 #include "Core/Logging.h"
-#include "Editor/EditorMenuBar.h"
-#include "Imgui/imgui.h"
+#include "Editor/Editor.h"
+#include "Editor/ImGui/EmberImGui.h"
 
 static void EmberAppUpdate(ember_app_t* App)
 {
@@ -10,8 +10,7 @@ static void EmberAppUpdate(ember_app_t* App)
 
 static void EmberAppRender(ember_app_t* App)
 {
-    ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
-    EditorMenuBarRender(App);
+    EmberEditorRender();
 }
 
 static void UpdateFrame(ember_app_t* App)
@@ -22,11 +21,13 @@ static void UpdateFrame(ember_app_t* App)
 
 static void RenderFrame(ember_app_t* App)
 {
-    EmberWindowBeginFrame(&App->Window);
+    EmberRendererBeginFrame(&App->Renderer, &App->Window);
+    EmberImGuiNewFrame();
     {
         EmberAppRender(App);
     }
-    EmberWindowEndFrame(&App->Window);
+    EmberImGuiEndFrame();
+    EmberRendererEndFrame(&App->Renderer);
 }
 
 bool EmberAppInit(ember_app_t* App, ember_app_config_t Config)
@@ -42,6 +43,18 @@ bool EmberAppInit(ember_app_t* App, ember_app_config_t Config)
         EMBER_LOG(Critical, "Window Init Failure.");
         return false;
     }
+
+    if(!EmberRendererInit(&App->Renderer, &App->Window))
+    {
+        EMBER_LOG(Critical, "VulkanRenderer Create Failure!");
+        return false;
+    }
+
+    if(!EmberImGuiInit(&App->Renderer, &App->Window))
+    {
+        EMBER_LOG(Critical, "ImGui Init Failure!");
+        return false;
+    }
     
     App->State.IsRunning = true;
     return App->State.IsRunning;
@@ -49,6 +62,8 @@ bool EmberAppInit(ember_app_t* App, ember_app_config_t Config)
 
 void EmberAppDestroy(ember_app_t* App)
 {
+    EmberImGuiShutdown();
+    EmberRendererShutdown(&App->Renderer);
     EmberWindowDestroy(&App->Window);
     EmberPlatformShutdown(&App->Platform);
 }

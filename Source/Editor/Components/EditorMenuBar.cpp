@@ -1,10 +1,8 @@
-﻿#include "Editor/EditorMenuBar.h"
+﻿#include "Editor/Components/EditorMenuBar.h"
 #include <Imgui/imgui.h>
 
-void EditorMenuBarRender(ember_app_t* App)
+void EditorMenuBarRender()
 {
-    static editor_menu_bar_t MenuBar;
-    
     if(ImGui::BeginMainMenuBar())
     {
         if(ImGui::BeginMenu("File"))
